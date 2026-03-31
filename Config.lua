@@ -41,6 +41,28 @@ local outlineOrder = {
     "THICKOUTLINE",
     "MONOCHROME"
 }
+local absorbSides = {
+    ["LEFT"] = L["Слева"],
+    ["RIGHT"] = L["Справа"],
+}
+
+local function GetColorValue(path, field, fallback)
+    local color = path[field]
+    if type(color) ~= "table" then
+        return fallback.r, fallback.g, fallback.b, fallback.a
+    end
+
+    return color.r or fallback.r, color.g or fallback.g, color.b or fallback.b, color.a or fallback.a
+end
+
+local function SetColorValue(path, field, r, g, b, a)
+    path[field] = {
+        r = r,
+        g = g,
+        b = b,
+        a = a,
+    }
+end
 
 local function GetSpellIDFilterInput(path, field)
     return {
@@ -1049,6 +1071,90 @@ local function GetUnitGroups(path)
                         path.statusY = v; msh:Refresh()
                     end
                 },
+                healAbsorbBar = {
+                    type = "group",
+                    name = L["Полоса поглощения исцеления"],
+                    order = 20,
+                    inline = true,
+                    args = {
+                        healAbsorbTexture = {
+                            type = "select",
+                            name = L["Текстура"],
+                            order = 1,
+                            values = LSM:HashTable("statusbar"),
+                            dialogControl = "LSM30_Statusbar",
+                            get = function() return path.healAbsorbTexture end,
+                            set = function(_, v)
+                                path.healAbsorbTexture = v; msh:Refresh()
+                            end,
+                        },
+                        healAbsorbColor = {
+                            type = "color",
+                            name = L["Цвет"],
+                            order = 2,
+                            hasAlpha = true,
+                            get = function()
+                                return GetColorValue(path, "healAbsorbColor", { r = 0.45, g = 0.12, b = 0.12, a = 0.9 })
+                            end,
+                            set = function(_, r, g, b, a)
+                                SetColorValue(path, "healAbsorbColor", r, g, b, a)
+                                msh:Refresh()
+                            end,
+                        },
+                        healAbsorbSide = {
+                            type = "select",
+                            name = L["Сторона"],
+                            order = 3,
+                            values = absorbSides,
+                            get = function() return path.healAbsorbSide or "LEFT" end,
+                            set = function(_, v)
+                                path.healAbsorbSide = v; msh:Refresh()
+                            end,
+                        },
+                    }
+                },
+                shieldBar = {
+                    type = "group",
+                    name = L["Полоса щитов"],
+                    order = 30,
+                    inline = true,
+                    args = {
+                        shieldTexture = {
+                            type = "select",
+                            name = L["Текстура"],
+                            order = 1,
+                            values = LSM:HashTable("statusbar"),
+                            dialogControl = "LSM30_Statusbar",
+                            get = function() return path.shieldTexture end,
+                            set = function(_, v)
+                                path.shieldTexture = v; msh:Refresh()
+                            end,
+                        },
+                        shieldColor = {
+                            type = "color",
+                            name = L["Цвет"],
+                            order = 2,
+                            hasAlpha = true,
+                            get = function()
+                                return GetColorValue(path, "shieldColor", { r = 0.18, g = 0.62, b = 0.85, a = 0.9 })
+                            end,
+                            set = function(_, r, g, b, a)
+                                SetColorValue(path, "shieldColor", r, g, b, a)
+                                msh:Refresh()
+                            end,
+                        },
+                        shieldSide = {
+                            type = "select",
+                            name = L["Сторона"],
+                            order = 3,
+                            values = absorbSides,
+                            get = function() return path.shieldSide or "RIGHT" end,
+                            set = function(_, v)
+                                path.shieldSide = v; msh:Refresh()
+                            end,
+                        },
+                    }
+                },
             }
         },
         auras = {
@@ -1290,6 +1396,12 @@ local defaultProfile = {
     statusPoint = "RIGHT",
     statusX = -2,
     statusY = 0,
+    healAbsorbTexture = "Solid",
+    healAbsorbColor = { r = 0.45, g = 0.12, b = 0.12, a = 0.9 },
+    healAbsorbSide = "LEFT",
+    shieldTexture = "Solid",
+    shieldColor = { r = 0.18, g = 0.62, b = 0.85, a = 0.9 },
+    shieldSide = "RIGHT",
 
     showBuffs = true,
     useBlizzBuffs = true,

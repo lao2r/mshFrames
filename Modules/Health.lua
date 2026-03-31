@@ -3,13 +3,83 @@ local msh = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 
 local isUpdating = false
+local defaultHealAbsorbColor = { r = 0.45, g = 0.12, b = 0.12, a = 0.9 }
+local defaultShieldColor = { r = 0.18, g = 0.62, b = 0.85, a = 0.9 }
+
+local function GetPredictionColor(cfg, field, fallback)
+    local color = cfg and cfg[field]
+    if type(color) ~= "table" then
+        return fallback.r, fallback.g, fallback.b, fallback.a
+    end
+
+    return color.r or fallback.r, color.g or fallback.g, color.b or fallback.b, color.a or fallback.a
+end
+
+local function StylePredictionTexture(texture, texturePath, r, g, b, a, subLevel)
+    if not texture then return end
+
+    texture:SetTexture(texturePath)
+    texture:SetVertexColor(r, g, b, a)
+
+    if texture.SetDrawLayer then
+        texture:SetDrawLayer("ARTWORK", subLevel or 1)
+    end
+end
+
+local function SetPredictionDrawLayer(texture, layer, subLevel)
+    if texture and texture.SetDrawLayer then
+        texture:SetDrawLayer(layer, subLevel or 1)
+    end
+end
+
+local function ApplyHealAbsorbSide(frame, side)
+    local bar = frame and frame.myHealAbsorb
+    local healthTexture = frame and frame.healthBar and frame.healthBar:GetStatusBarTexture()
+
+    if not bar or not bar:IsShown() or not healthTexture then
+        return
+    end
+
+    bar:ClearAllPoints()
+
+    if side == "RIGHT" then
+        bar:SetPoint("TOPLEFT", healthTexture, "TOPLEFT", 0, 0)
+        bar:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMLEFT", 0, 0)
+    else
+        bar:SetPoint("TOPRIGHT", healthTexture, "TOPRIGHT", 0, 0)
+        bar:SetPoint("BOTTOMRIGHT", healthTexture, "BOTTOMRIGHT", 0, 0)
+    end
+end
+
+local function ApplyShieldSide(frame, side)
+    local bar = frame and frame.totalAbsorb
+
+    if not bar or not bar:IsShown() then
+        return
+    end
+
+    local _, relativeTo = bar:GetPoint(1)
+    if not relativeTo then
+        return
+    end
+
+    bar:ClearAllPoints()
+
+    if side == "LEFT" then
+        bar:SetPoint("TOPRIGHT", relativeTo, "TOPLEFT", 0, 0)
+        bar:SetPoint("BOTTOMRIGHT", relativeTo, "BOTTOMLEFT", 0, 0)
+    else
+        bar:SetPoint("TOPLEFT", relativeTo, "TOPRIGHT", 0, 0)
+        bar:SetPoint("BOTTOMLEFT", relativeTo, "BOTTOMRIGHT", 0, 0)
+    end
+end
 
 function msh.CreateHealthLayers(frame)
     if not msh.db or not msh.db.profile then return end
-    local cfg = msh.GetConfigForFrame(frame)
     if frame.mshHealthCreated then return end
 
     frame.mshHP = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    frame.mshHP:SetDrawLayer("OVERLAY", 7)
 
     if not frame.mshHoverTex then
         frame.mshHoverTex = frame:CreateTexture(nil, "ARTWORK", nil, 1)
@@ -37,6 +107,30 @@ function msh.CreateHealthLayers(frame)
     if frame.statusText then frame.statusText:SetAlpha(0) end
 
     frame.mshHealthCreated = true
+end
+
+function msh.UpdateHealthPredictionDisplay(frame)
+    if not frame or frame:IsForbidden() then return end
+
+    local cfg = msh.GetConfigForFrame(frame)
+    if not cfg then return end
+
+    local healAbsorbTexture = LSM:Fetch("statusbar", cfg.healAbsorbTexture or cfg.texture or "Solid")
+    local shieldTexture = LSM:Fetch("statusbar", cfg.shieldTexture or cfg.texture or "Solid")
+    local healR, healG, healB, healA = GetPredictionColor(cfg, "healAbsorbColor", defaultHealAbsorbColor)
+    local shieldR, shieldG, shieldB, shieldA = GetPredictionColor(cfg, "shieldColor", defaultShieldColor)
+
+    StylePredictionTexture(frame.myHealAbsorb, healAbsorbTexture, healR, healG, healB, healA, 2)
+    StylePredictionTexture(frame.totalAbsorb, shieldTexture, shieldR, shieldG, shieldB, shieldA, 2)
+
+    SetPredictionDrawLayer(frame.totalAbsorbOverlay, "ARTWORK", 3)
+    SetPredictionDrawLayer(frame.overAbsorbGlow, "ARTWORK", 4)
+    SetPredictionDrawLayer(frame.overHealAbsorbGlow, "ARTWORK", 4)
+    SetPredictionDrawLayer(frame.myHealAbsorbLeftShadow, "ARTWORK", 3)
+    SetPredictionDrawLayer(frame.myHealAbsorbRightShadow, "ARTWORK", 3)
+
+    ApplyHealAbsorbSide(frame, cfg.healAbsorbSide or "LEFT")
+    ApplyShieldSide(frame, cfg.shieldSide or "RIGHT")
 end
 
 function msh.UpdateHealthDisplay(frame)
@@ -92,5 +186,13 @@ function msh.UpdateHealthDisplay(frame)
         frame.mshHP:Show()
     end
 
+    msh.UpdateHealthPredictionDisplay(frame)
+
     isUpdating = false
 end
+
+hooksecurefunc("CompactUnitFrame_UpdateHealPrediction", function(frame)
+    if msh.UpdateHealthPredictionDisplay then
+        msh.UpdateHealthPredictionDisplay(frame)
+    end
+end)

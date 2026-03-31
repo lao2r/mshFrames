@@ -2,15 +2,69 @@ local _, ns = ...
 local msh = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 local dispelOverlayPreviewState = setmetatable({}, { __mode = "k" })
-local knownDispelTypes = { "Magic", "Curse", "Disease", "Poison" }
+local knownDispelTypes = { "Magic", "Curse", "Disease", "Poison", "Bleed" }
+local dispelTypeAliases
+local DEBUG_DISPEL = false
+local dispelCurveCache = setmetatable({}, { __mode = "k" })
+local dispelLookupCurve
+local dispelEnumByType = {
+    Magic = 1,
+    Curse = 2,
+    Disease = 3,
+    Poison = 4,
+    Bleed = 11,
+}
+local dispelLookupColorByType = {
+    Magic = { 1, 0, 0, 1 },
+    Curse = { 0, 1, 0, 1 },
+    Disease = { 0, 0, 1, 1 },
+    Poison = { 1, 1, 0, 1 },
+    Bleed = { 1, 0, 1, 1 },
+}
+local dispelTypeByLookupColor = {
+    ["1.000:0.000:0.000:1.000"] = "Magic",
+    ["0.000:1.000:0.000:1.000"] = "Curse",
+    ["0.000:0.000:1.000:1.000"] = "Disease",
+    ["1.000:1.000:0.000:1.000"] = "Poison",
+    ["1.000:0.000:1.000:1.000"] = "Bleed",
+}
 local defaultDispelColors = {
     Magic = { r = 0.20, g = 0.60, b = 1.00, a = 0.95 },
     Curse = { r = 0.60, g = 0.00, b = 1.00, a = 0.95 },
     Disease = { r = 0.75, g = 0.55, b = 0.20, a = 0.95 },
     Poison = { r = 0.00, g = 0.85, b = 0.20, a = 0.95 },
+    Bleed = { r = 0.80, g = 0.10, b = 0.10, a = 0.95 },
 }
 local dispelOverlaySides = { "TOP", "BOTTOM", "LEFT", "RIGHT" }
 local dashedSegmentsPerSide = 16
+local function BuildDispelTypeAliases()
+    local aliases = {
+        Magic = { "Magic", "magic", 8 },
+        Disease = { "Disease", "disease", 16 },
+        Curse = { "Curse", "curse", 32 },
+        Poison = { "Poison", "poison", 64 },
+        Bleed = { "Bleed", "bleed" },
+    }
+
+    local localizedTypes = {
+        Magic = _G and _G.DEBUFF_TYPE_MAGIC,
+        Disease = _G and _G.DEBUFF_TYPE_DISEASE,
+        Curse = _G and _G.DEBUFF_TYPE_CURSE,
+        Poison = _G and _G.DEBUFF_TYPE_POISON,
+        Bleed = _G and _G.DEBUFF_TYPE_BLEED,
+    }
+
+    for dispelType, localizedName in pairs(localizedTypes) do
+        if type(localizedName) == "string" and localizedName ~= "" then
+            table.insert(aliases[dispelType], localizedName)
+            table.insert(aliases[dispelType], string.lower(localizedName))
+        end
+    end
+
+    return aliases
+end
+
+dispelTypeAliases = BuildDispelTypeAliases()
 
 local function EnsureTextLayer(frame)
     if not frame or frame.mshTextLayer then
@@ -32,13 +86,40 @@ local function SafeEquals(left, right)
 end
 
 local function NormalizeDispelType(value)
-    if not value then
+    if value == nil then
+        return nil
+    end
+
+    local ok, token = pcall(function()
+        local textValue = tostring(value)
+        if type(textValue) ~= "string" or textValue == "" then
+            return nil
+        end
+
+        local plainValue = string.format("%s", textValue)
+        if type(plainValue) ~= "string" or plainValue == "" then
+            return nil
+        end
+
+        return string.lower(plainValue)
+    end)
+
+    if not ok or type(token) ~= "string" or token == "" then
         return nil
     end
 
     for _, dispelType in ipairs(knownDispelTypes) do
-        if SafeEquals(value, dispelType) then
-            return dispelType
+        local aliases = dispelTypeAliases[dispelType]
+        if aliases then
+            for _, alias in ipairs(aliases) do
+                local aliasToken = string.lower(tostring(alias))
+                local matched, containsAlias = pcall(function()
+                    return string.find(token, aliasToken, 1, true) ~= nil
+                end)
+                if matched and containsAlias then
+                    return dispelType
+                end
+            end
         end
     end
 
@@ -50,6 +131,64 @@ local function CreateOverlayTexture(parent, subLevel)
     texture:SetTexture("Interface\\Buttons\\White8x8")
     texture:Hide()
     return texture
+end
+
+local function GetStringToken(value)
+    if value == nil then
+        return nil
+    end
+
+    local ok, token = pcall(function()
+        local textValue = string.format("%s", value)
+        if type(textValue) ~= "string" or textValue == "" then
+            return nil
+        end
+
+        return string.lower(textValue)
+    end)
+
+    if ok and type(token) == "string" and token ~= "" then
+        return token
+    end
+
+    return nil
+end
+
+local function DebugDispelSource(frame, message)
+    if not DEBUG_DISPEL then
+        return
+    end
+
+    if not DEFAULT_CHAT_FRAME or not message then
+        return
+    end
+
+    local frameName = frame and frame.GetName and frame:GetName() or "?"
+    local fullMessage = string.format("mshFrames dispel source: frame=%s %s", tostring(frameName), tostring(message))
+    DEFAULT_CHAT_FRAME:AddMessage(fullMessage)
+end
+
+local function SafeDebugValue(value)
+    local ok, rawValue = pcall(tostring, value)
+    if ok then
+        return rawValue
+    end
+
+    return "<error>"
+end
+
+local function SafeAuraValue(value)
+    if value == nil then
+        return nil
+    end
+
+    if issecretvalue and issecretvalue(value) then
+        if canaccessvalue and not canaccessvalue(value) then
+            return nil
+        end
+    end
+
+    return value
 end
 
 local function EnsureDispelOverlay(frame)
@@ -64,6 +203,9 @@ local function EnsureDispelOverlay(frame)
     overlay:SetFrameLevel((frame.mshTextLayer and frame.mshTextLayer:GetFrameLevel()) or frame:GetFrameLevel() + 2)
     overlay:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT")
     overlay:SetPoint("BOTTOMRIGHT", frame.healthBar, "BOTTOMRIGHT")
+    if overlay.SetClipsChildren then
+        overlay:SetClipsChildren(true)
+    end
     overlay:Hide()
 
     overlay.solidEdges = {}
@@ -118,38 +260,27 @@ local function LayoutDashedSide(textures, overlay, side, thickness, dashLength, 
         return
     end
 
-    local span = (side == "TOP" or side == "BOTTOM") and overlay:GetWidth() or overlay:GetHeight()
-    local count = math.max(1, math.min(#textures, math.floor((span + dashGap) / (dashLength + dashGap))))
-    local startOffset = 0
-
-    if count > 0 then
-        local used = count * dashLength + (count - 1) * dashGap
-        startOffset = math.max(0, math.floor((span - used) / 2))
-    end
-
     for index, texture in ipairs(textures) do
         texture:ClearAllPoints()
 
-        if index <= count then
-            local offset = startOffset + (index - 1) * (dashLength + dashGap)
+        local offset = (index - 1) * (dashLength + dashGap)
 
-            if side == "TOP" then
-                texture:SetPoint("TOPLEFT", overlay, "TOPLEFT", offset, 0)
-                texture:SetSize(dashLength, thickness)
-            elseif side == "BOTTOM" then
-                texture:SetPoint("BOTTOMLEFT", overlay, "BOTTOMLEFT", offset, 0)
-                texture:SetSize(dashLength, thickness)
-            elseif side == "LEFT" then
-                texture:SetPoint("TOPLEFT", overlay, "TOPLEFT", 0, -offset)
-                texture:SetSize(thickness, dashLength)
-            else
-                texture:SetPoint("TOPRIGHT", overlay, "TOPRIGHT", 0, -offset)
-                texture:SetSize(thickness, dashLength)
-            end
-
+        if side == "TOP" then
+            texture:SetPoint("TOPLEFT", overlay, "TOPLEFT", offset, 0)
+            texture:SetSize(dashLength, thickness)
+            texture:Show()
+        elseif side == "BOTTOM" then
+            texture:SetPoint("BOTTOMLEFT", overlay, "BOTTOMLEFT", offset, 0)
+            texture:SetSize(dashLength, thickness)
+            texture:Show()
+        elseif side == "LEFT" then
+            texture:SetPoint("TOPLEFT", overlay, "TOPLEFT", 0, -offset)
+            texture:SetSize(thickness, dashLength)
             texture:Show()
         else
-            texture:Hide()
+            texture:SetPoint("TOPRIGHT", overlay, "TOPRIGHT", 0, -offset)
+            texture:SetSize(thickness, dashLength)
+            texture:Show()
         end
     end
 end
@@ -160,13 +291,15 @@ local function HideDispelOverlay(frame)
         HideEdgeSet(frame.mshDispelOverlayFrame.solidEdges)
         HideAllPixelEdges(frame.mshDispelOverlayFrame)
     end
+end
 
+local function SetNativeDispelOverlayAlpha(frame, alpha)
     if frame and frame.DispelOverlay and frame.DispelOverlay.SetAlpha then
         if frame.DispelOverlay.mshOriginalAlpha == nil and frame.DispelOverlay.GetAlpha then
             frame.DispelOverlay.mshOriginalAlpha = frame.DispelOverlay:GetAlpha()
         end
 
-        frame.DispelOverlay:SetAlpha(frame.DispelOverlay.mshOriginalAlpha or 1)
+        frame.DispelOverlay:SetAlpha(alpha)
     end
 end
 
@@ -193,28 +326,243 @@ local function LayoutOverlayEdge(texture, overlay, side, offset, thickness)
 end
 
 local function GetDispelOverlayColor(cfg, dispelType)
+    local normalizedType = NormalizeDispelType(dispelType) or "Magic"
     local field, fallback
 
-    if dispelType == "Curse" then
+    if normalizedType == "Curse" then
         field = "dispelOverlayCurseColor"
         fallback = defaultDispelColors.Curse
-    elseif dispelType == "Disease" then
+    elseif normalizedType == "Disease" then
         field = "dispelOverlayDiseaseColor"
         fallback = defaultDispelColors.Disease
-    elseif dispelType == "Poison" then
+    elseif normalizedType == "Poison" then
         field = "dispelOverlayPoisonColor"
         fallback = defaultDispelColors.Poison
+    elseif normalizedType == "Bleed" then
+        field = nil
+        fallback = defaultDispelColors.Bleed
     else
         field = "dispelOverlayMagicColor"
         fallback = defaultDispelColors.Magic
     end
 
-    local color = cfg and cfg[field]
+    local color = field and cfg and cfg[field]
     if type(color) ~= "table" then
         return fallback.r, fallback.g, fallback.b, fallback.a
     end
 
     return color.r or fallback.r, color.g or fallback.g, color.b or fallback.b, color.a or fallback.a
+end
+
+local function GetDispelLookupSignature(r, g, b, a)
+    return string.format("%.3f:%.3f:%.3f:%.3f", r or 0, g or 0, b or 0, a or 1)
+end
+
+local function CreateDispelColor(r, g, b, a)
+    if not _G.CreateColor then
+        return nil
+    end
+
+    return _G.CreateColor(r or 1, g or 1, b or 1, a or 1)
+end
+
+local function GetDispelCurveSignature(cfg)
+    local parts = {}
+
+    for _, dispelType in ipairs(knownDispelTypes) do
+        local r, g, b, a = GetDispelOverlayColor(cfg, dispelType)
+        parts[#parts + 1] = GetDispelLookupSignature(r, g, b, a)
+    end
+
+    return table.concat(parts, "|")
+end
+
+local function BuildDispelColorCurve(cfg)
+    if not cfg or not C_CurveUtil or not C_CurveUtil.CreateColorCurve or not _G.Enum or not _G.Enum.LuaCurveType then
+        return nil
+    end
+
+    local curve = C_CurveUtil.CreateColorCurve()
+    curve:SetType(_G.Enum.LuaCurveType.Step)
+
+    for _, dispelType in ipairs(knownDispelTypes) do
+        local dispelEnum = dispelEnumByType[dispelType]
+        local color = CreateDispelColor(GetDispelOverlayColor(cfg, dispelType))
+        if dispelEnum and color then
+            curve:AddPoint(dispelEnum, color)
+        end
+    end
+
+    return curve
+end
+
+local function GetDispelColorCurve(cfg)
+    if not cfg then
+        return nil
+    end
+
+    local signature = GetDispelCurveSignature(cfg)
+    local cached = dispelCurveCache[cfg]
+    if cached and cached.signature == signature then
+        return cached.curve
+    end
+
+    local curve = BuildDispelColorCurve(cfg)
+    dispelCurveCache[cfg] = {
+        signature = signature,
+        curve = curve,
+    }
+
+    return curve
+end
+
+local function GetDispelLookupCurve()
+    if dispelLookupCurve or not C_CurveUtil or not C_CurveUtil.CreateColorCurve or not _G.Enum or not _G.Enum.LuaCurveType then
+        return dispelLookupCurve
+    end
+
+    local curve = C_CurveUtil.CreateColorCurve()
+    curve:SetType(_G.Enum.LuaCurveType.Step)
+
+    for _, dispelType in ipairs(knownDispelTypes) do
+        local dispelEnum = dispelEnumByType[dispelType]
+        local colorValues = dispelLookupColorByType[dispelType]
+        local color = colorValues and CreateDispelColor(colorValues[1], colorValues[2], colorValues[3], colorValues[4])
+        if dispelEnum and color then
+            curve:AddPoint(dispelEnum, color)
+        end
+    end
+
+    dispelLookupCurve = curve
+    return dispelLookupCurve
+end
+
+local function GetActiveDispelAuraInstanceID(activeDispelIcon)
+    if not activeDispelIcon then
+        return nil
+    end
+
+    return activeDispelIcon.mshAuraInstanceID or activeDispelIcon.auraInstanceID
+end
+
+local function GetAuraDispelCurveColor(frame, activeDispelIcon, curve)
+    local unit = frame and (frame.displayedUnit or frame.unit)
+    local auraInstanceID = GetActiveDispelAuraInstanceID(activeDispelIcon)
+
+    if not unit or not auraInstanceID or not C_UnitAuras or not C_UnitAuras.GetAuraDispelTypeColor or not curve then
+        return nil, nil, nil, nil
+    end
+
+    local okColor, color = pcall(C_UnitAuras.GetAuraDispelTypeColor, unit, auraInstanceID, curve)
+    if not okColor or not color or not color.GetRGBA then
+        return nil, nil, nil, nil
+    end
+
+    local okRGBA, r, g, b, a = pcall(color.GetRGBA, color)
+    if not okRGBA then
+        return nil, nil, nil, nil
+    end
+
+    return r, g, b, a
+end
+
+local function GetAuraDispelTypeFromCurve(frame, activeDispelIcon)
+    return nil
+end
+
+local function GetConfiguredDispelColor(frame, cfg, activeDispelIcon)
+    return GetAuraDispelCurveColor(frame, activeDispelIcon, GetDispelColorCurve(cfg))
+end
+
+local function IsUsefulDispelColor(r, g, b)
+    return r ~= nil and g ~= nil and b ~= nil
+end
+
+local function GetTextureDispelType(textureObject)
+    if not textureObject then
+        return nil
+    end
+
+    local atlasToken = textureObject.GetAtlas and GetStringToken(textureObject:GetAtlas()) or nil
+    local dispelType = NormalizeDispelType(atlasToken)
+    if dispelType then
+        return dispelType
+    end
+
+    local textureToken = textureObject.GetTexture and GetStringToken(textureObject:GetTexture()) or nil
+    return NormalizeDispelType(textureToken)
+end
+
+local function GetNamedDispelTexture(icon, suffix)
+    if not icon or not icon.GetName then
+        return nil
+    end
+
+    local name = icon:GetName()
+    if not name or name == "" then
+        return nil
+    end
+
+    local region = _G[name .. suffix]
+    if region and region.IsObjectType and region:IsObjectType("Texture") then
+        return region
+    end
+
+    return nil
+end
+
+local function GetNativeIconBorder(icon)
+    if not icon then
+        return nil
+    end
+
+    return icon.border or icon.Border or icon.IconBorder or GetNamedDispelTexture(icon, "Border") or
+        GetNamedDispelTexture(icon, "IconBorder")
+end
+
+local function GetPreferredTextureColor(regionOwner)
+    if not regionOwner then
+        return nil, nil, nil, nil
+    end
+
+    if regionOwner.IsObjectType and regionOwner:IsObjectType("Texture") then
+        local r, g, b, a = regionOwner:GetVertexColor()
+        return r, g, b, a
+    end
+
+    if not regionOwner.GetRegions then
+        return nil, nil, nil, nil
+    end
+
+    local bestR, bestG, bestB, bestA
+    local bestScore = -1
+    local regions = { regionOwner:GetRegions() }
+    for _, region in ipairs(regions) do
+        if region and region.IsObjectType and region:IsObjectType("Texture") and region:IsShown() then
+            local r, g, b, a = region:GetVertexColor()
+            local score = 0
+            local regionName = region.GetName and GetStringToken(region:GetName()) or nil
+            local atlasToken = region.GetAtlas and GetStringToken(region:GetAtlas()) or nil
+            local textureToken = region.GetTexture and GetStringToken(region:GetTexture()) or nil
+
+            if regionName and (string.find(regionName, "border", 1, true) or string.find(regionName, "glow", 1, true)) then
+                score = score + 3
+            end
+            if atlasToken and (string.find(atlasToken, "border", 1, true) or string.find(atlasToken, "glow", 1, true)) then
+                score = score + 2
+            end
+            if textureToken and string.find(textureToken, "border", 1, true) then
+                score = score + 2
+            end
+
+            if score > bestScore then
+                bestScore = score
+                bestR, bestG, bestB, bestA = r, g, b, a
+            end
+        end
+    end
+
+    return bestR, bestG, bestB, bestA
 end
 
 local function GetBlizzardDispelReferenceColor(dispelType)
@@ -251,25 +599,7 @@ local function FindVisibleTextureColor(regionOwner)
 end
 
 local function GuessDispelTypeFromColor(r, g, b)
-    if not r or not g or not b then
-        return nil
-    end
-
-    local bestType
-    local bestDistance
-
-    for _, dispelType in ipairs(knownDispelTypes) do
-        local refR, refG, refB = GetBlizzardDispelReferenceColor(dispelType)
-        if refR and refG and refB then
-            local distance = ((r - refR) * (r - refR)) + ((g - refG) * (g - refG)) + ((b - refB) * (b - refB))
-            if not bestDistance or distance < bestDistance then
-                bestDistance = distance
-                bestType = dispelType
-            end
-        end
-    end
-
-    return bestType
+    return nil
 end
 
 local function GetNativeDispelVisual(frame, activeDispelIcon)
@@ -279,21 +609,73 @@ local function GetNativeDispelVisual(frame, activeDispelIcon)
     if activeDispelIcon then
         shown = activeDispelIcon:IsShown()
 
-        local border = activeDispelIcon.border or activeDispelIcon.Border or activeDispelIcon.IconBorder
+        local border = GetNativeIconBorder(activeDispelIcon)
         if border and border.GetVertexColor then
             r, g, b, a = border:GetVertexColor()
+        end
+
+        if (not r or not g or not b) and border then
+            local texR, texG, texB, texA = GetPreferredTextureColor(border)
+            if texR and texG and texB then
+                r, g, b, a = texR, texG, texB, texA
+            end
+        end
+
+        if (not r or not g or not b) then
+            local texR, texG, texB, texA = GetPreferredTextureColor(activeDispelIcon)
+            if texR and texG and texB then
+                r, g, b, a = texR, texG, texB, texA
+            end
+        end
+
+        if (not r or not g or not b) and activeDispelIcon.icon and activeDispelIcon.icon.GetVertexColor then
+            r, g, b, a = activeDispelIcon.icon:GetVertexColor()
         end
     end
 
     if frame and frame.DispelOverlay then
         shown = shown or frame.DispelOverlay:IsShown()
-        local foundTexture, texR, texG, texB, texA = FindVisibleTextureColor(frame.DispelOverlay)
-        if foundTexture and (not r or not g or not b) then
+        local texR, texG, texB, texA = GetPreferredTextureColor(frame.DispelOverlay)
+        if texR and texG and texB and (not r or not g or not b) then
             r, g, b, a = texR, texG, texB, texA
         end
     end
 
     return shown, r, g, b, a
+end
+
+local function GetRaidDispelAuraType(frame, cfg)
+    local unit = frame and (frame.displayedUnit or frame.unit)
+    if not unit or not UnitExists(unit) or not C_UnitAuras or not C_UnitAuras.GetDebuffDataByIndex then
+        return nil
+    end
+
+    if UnitIsDeadOrGhost(unit) or not UnitIsConnected(unit) then
+        return nil
+    end
+
+    local index = 1
+    while true do
+        local rawAura = C_UnitAuras.GetDebuffDataByIndex(unit, index, "RAID")
+        if not rawAura then
+            break
+        end
+
+        local spellID = SafeAuraValue(rawAura.spellId) or SafeAuraValue(rawAura.spellID)
+        local isExcluded = msh.IsExcludedSpell and msh.IsExcludedSpell(cfg, "excludedDebuffSpellIDs", spellID)
+        if not isExcluded then
+            local dispelType = NormalizeDispelType(SafeAuraValue(rawAura.dispelName)) or
+                NormalizeDispelType(SafeAuraValue(rawAura.dispelType)) or
+                NormalizeDispelType(SafeAuraValue(rawAura.debuffType))
+            if dispelType then
+                return dispelType, spellID
+            end
+        end
+
+        index = index + 1
+    end
+
+    return nil
 end
 
 local function ApplySolidDispelOverlay(frame, r, g, b, a, thickness)
@@ -312,20 +694,6 @@ local function ApplySolidDispelOverlay(frame, r, g, b, a, thickness)
         texture:SetVertexColor(r, g, b, a)
         texture:Show()
     end
-end
-
-local function GetFrameDispelType(frame)
-    if not frame or not frame.dispels then
-        return nil
-    end
-
-    for _, dispelType in ipairs(knownDispelTypes) do
-        if frame.dispels[dispelType] then
-            return dispelType
-        end
-    end
-
-    return nil
 end
 
 local function ApplyPixelDispelOverlay(frame, r, g, b, a, thickness, dashLength, dashGap)
@@ -380,35 +748,94 @@ local function GetDispelTypeForIcon(icon)
         return nil
     end
 
-    return NormalizeDispelType(
-        (msh.GetAuraDispelType and msh.GetAuraDispelType(icon)) or icon.mshDispelType or icon.dispelName or icon.dispelType or
-        icon.debuffType
+    local dispelType = NormalizeDispelType(
+        (msh.GetAuraDispelType and msh.GetAuraDispelType(icon)) or
+        SafeDebugValue(icon.mshDispelType) or
+        SafeDebugValue(icon.dispelName) or
+        SafeDebugValue(icon.dispelType) or
+        SafeDebugValue(icon.debuffType)
     )
+    if dispelType then
+        return dispelType
+    end
+
+    dispelType = GetTextureDispelType(icon.icon)
+    if dispelType then
+        return dispelType
+    end
+
+    dispelType = GetTextureDispelType(GetNativeIconBorder(icon))
+    if dispelType then
+        return dispelType
+    end
+
+    return nil
 end
 
-local function GetPreviewDispelIconVisual(cfg)
-    local previewType = NormalizeDispelType(cfg and cfg.dispelOverlayPreviewType) or "Magic"
+local function GetFrameDispelType(frame)
+    local dispelType = NormalizeDispelType(frame and SafeDebugValue(frame.mshLastDispelType))
+    if dispelType then
+        local activeAuraInstanceID = frame and frame.mshActiveDispelAuraInstanceID
+        local lastAuraInstanceID = frame and frame.mshLastDispelAuraInstanceID
+        if activeAuraInstanceID and lastAuraInstanceID and SafeEquals(activeAuraInstanceID, lastAuraInstanceID) then
+            return dispelType
+        end
+    end
 
-    if previewType == "Curse" then
+    return nil
+end
+
+local function ResolveDispelType(frame, activeDispelIcon, nativeR, nativeG, nativeB)
+    frame.mshActiveDispelAuraInstanceID = GetActiveDispelAuraInstanceID(activeDispelIcon)
+    return frame.mshLiveDispelType or GetDispelTypeForIcon(activeDispelIcon) or GetFrameDispelType(frame) or
+        GuessDispelTypeFromColor(nativeR, nativeG, nativeB)
+end
+
+local function GetDispelTypeIconVisual(dispelType)
+    local normalizedType = NormalizeDispelType(dispelType) or "Magic"
+
+    if normalizedType == "Curse" then
         return "icons_16x16_curse", nil
-    elseif previewType == "Disease" then
+    elseif normalizedType == "Disease" then
         return "icons_16x16_disease", nil
-    elseif previewType == "Poison" then
+    elseif normalizedType == "Poison" then
         return "icons_16x16_poison", nil
     end
 
     return "icons_16x16_magic", nil
 end
 
-local function ShowDispelIndicator(frame, cfg, atlasName, texturePath)
+local function SetNativeDispelFramesAlpha(frame, alpha)
+    if not frame or not frame.dispelDebuffFrames then
+        return
+    end
+
+    for i = 1, #frame.dispelDebuffFrames do
+        local dispelFrame = frame.dispelDebuffFrames[i]
+        if dispelFrame then
+            dispelFrame:SetAlpha(alpha)
+        end
+    end
+end
+
+local function ShowDispelIndicator(frame, cfg, atlasName, texturePath, leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord)
     if not frame or not frame.mshDispelIndicator then
         return false
     end
+
+    if frame.mshDispelIndicator.SetAtlas then
+        frame.mshDispelIndicator:SetAtlas(nil)
+    end
+    frame.mshDispelIndicator:SetTexture(nil)
+    frame.mshDispelIndicator:SetTexCoord(0, 1, 0, 1)
 
     if atlasName then
         frame.mshDispelIndicator:SetAtlas(atlasName)
     elseif texturePath then
         frame.mshDispelIndicator:SetTexture(texturePath)
+        if leftTexCoord and rightTexCoord and topTexCoord and bottomTexCoord then
+            frame.mshDispelIndicator:SetTexCoord(leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord)
+        end
     else
         frame.mshDispelIndicator:Hide()
         return false
@@ -439,38 +866,52 @@ end
 local function UpdateDispelOverlay(frame, cfg, activeDispelIcon, globalMode, hadShownDispel)
     local previewEnabled = msh.IsDispelOverlayPreviewEnabled and msh.IsDispelOverlayPreviewEnabled(cfg)
     local nativeShown, nativeR, nativeG, nativeB, nativeA = GetNativeDispelVisual(frame, activeDispelIcon)
+    local usePreview = previewEnabled
+    local liveDispelType = usePreview and nil or GetDispelTypeForIcon(activeDispelIcon) or GetFrameDispelType(frame)
     HideDispelOverlay(frame)
+    SetNativeDispelOverlayAlpha(frame, 0)
+    frame.mshResolvedDispelType = nil
+    frame.mshLiveDispelType = liveDispelType
+    frame.mshActiveDispelAuraInstanceID = GetActiveDispelAuraInstanceID(activeDispelIcon)
 
     if cfg.dispelIndicatorOverlay == false then
         return
     end
 
-    if not previewEnabled and (globalMode == "0" or not nativeShown or (not activeDispelIcon and hadShownDispel)) then
+    if not usePreview and (globalMode == "0" or (not liveDispelType and not nativeShown) or (not activeDispelIcon and hadShownDispel and not liveDispelType)) then
         return
     end
 
     local dispelType
     local r, g, b, a
 
-    if previewEnabled then
+    if usePreview then
         dispelType = NormalizeDispelType(cfg.dispelOverlayPreviewType or "Magic") or "Magic"
         r, g, b, a = GetDispelOverlayColor(cfg, dispelType)
     else
-        dispelType = GetFrameDispelType(frame) or GetDispelTypeForIcon(activeDispelIcon) or
-            GuessDispelTypeFromColor(nativeR, nativeG, nativeB)
-        if dispelType then
+        dispelType = liveDispelType or ResolveDispelType(frame, activeDispelIcon, nativeR, nativeG, nativeB)
+        r, g, b, a = GetConfiguredDispelColor(frame, cfg, activeDispelIcon)
+        if not r or not g or not b then
+            if dispelType then
+                r, g, b, a = GetDispelOverlayColor(cfg, dispelType)
+            else
+                r = nativeR
+                g = nativeG
+                b = nativeB
+                a = nativeA
+            end
+        end
+
+        if dispelType and (not r or not g or not b) then
             r, g, b, a = GetDispelOverlayColor(cfg, dispelType)
-        else
-            r = nativeR
-            g = nativeG
-            b = nativeB
-            a = nativeA
         end
     end
 
     if not r or not g or not b then
         return
     end
+
+    frame.mshResolvedDispelType = dispelType
 
     EnsureDispelOverlay(frame)
 
@@ -479,14 +920,6 @@ local function UpdateDispelOverlay(frame, cfg, activeDispelIcon, globalMode, had
     local dashLength = math.max(2, math.floor(cfg.dispelOverlayDashLength or math.max(4, thickness * 3)))
     local dashGap = math.max(1, math.floor(cfg.dispelOverlayDashGap or math.max(2, thickness * 2)))
     a = a or 0.95
-
-    if frame.DispelOverlay and frame.DispelOverlay.SetAlpha then
-        if frame.DispelOverlay.mshOriginalAlpha == nil and frame.DispelOverlay.GetAlpha then
-            frame.DispelOverlay.mshOriginalAlpha = frame.DispelOverlay:GetAlpha()
-        end
-
-        frame.DispelOverlay:SetAlpha(0)
-    end
 
     if style == "PIXEL" then
         ApplyPixelDispelOverlay(frame, r, g, b, a, thickness, dashLength, dashGap)
@@ -609,35 +1042,54 @@ function msh.UpdateUnitDisplay(frame)
             globalMode = msh.db.profile.global.dispelIndicatorMode or "0"
         end
 
-        if frame.dispelDebuffFrames then
-            for i = 1, #frame.dispelDebuffFrames do
-                local dispelFrame = frame.dispelDebuffFrames[i]
-                if dispelFrame then
-                    dispelFrame:SetAlpha(1)
-                end
-            end
-        end
+        SetNativeDispelFramesAlpha(frame, 0)
 
         local blizzIcon, hadShownDispel = GetActiveDispelIcon(frame, cfg)
+        local usePreview = previewEnabled
         UpdateDispelOverlay(frame, cfg, blizzIcon, globalMode, hadShownDispel)
 
         if cfg.showDispelIndicator == false then
+            SetNativeDispelFramesAlpha(frame, 0)
             frame.mshDispelIndicator:Hide()
-        elseif previewEnabled then
-            local previewAtlas, previewTexture = GetPreviewDispelIconVisual(cfg)
+        elseif usePreview then
+            local previewAtlas, previewTexture = GetDispelTypeIconVisual(cfg and cfg.dispelOverlayPreviewType)
             if ShowDispelIndicator(frame, cfg, previewAtlas, previewTexture) then
-                if blizzIcon then
-                    blizzIcon:SetAlpha(0)
-                end
+                SetNativeDispelFramesAlpha(frame, 0)
             else
                 frame.mshDispelIndicator:Hide()
             end
         elseif globalMode == "0" then
             frame.mshDispelIndicator:Hide()
         else
-            if blizzIcon and blizzIcon:IsShown() and blizzIcon.icon then
-                local atlasName = blizzIcon.icon.GetAtlas and blizzIcon.icon:GetAtlas()
-                if ShowDispelIndicator(frame, cfg, atlasName, atlasName and nil or blizzIcon.icon:GetTexture()) then
+            local dispelType = frame.mshResolvedDispelType or frame.mshLiveDispelType
+            if not dispelType and blizzIcon and blizzIcon:IsShown() and blizzIcon.icon then
+                local nativeShown, nativeR, nativeG, nativeB = GetNativeDispelVisual(frame, blizzIcon)
+                dispelType = ResolveDispelType(frame, blizzIcon, nativeR, nativeG, nativeB)
+            end
+
+            if dispelType then
+                local atlasName, texturePath = GetDispelTypeIconVisual(dispelType)
+                local leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord = 0, 1, 0, 1
+                if blizzIcon and blizzIcon.icon and blizzIcon.icon.GetTexCoord then
+                    leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord = blizzIcon.icon:GetTexCoord()
+                end
+
+                if ShowDispelIndicator(frame, cfg, atlasName, texturePath or blizzIcon.icon:GetTexture(),
+                        leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord) then
+                    if blizzIcon then
+                        blizzIcon:SetAlpha(0)
+                    end
+                else
+                    frame.mshDispelIndicator:Hide()
+                end
+            elseif blizzIcon and blizzIcon:IsShown() and blizzIcon.icon then
+                local leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord = 0, 1, 0, 1
+                if blizzIcon.icon.GetTexCoord then
+                    leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord = blizzIcon.icon:GetTexCoord()
+                end
+
+                if ShowDispelIndicator(frame, cfg, nil, blizzIcon.icon:GetTexture(),
+                        leftTexCoord, rightTexCoord, topTexCoord, bottomTexCoord) then
                     blizzIcon:SetAlpha(0)
                 else
                     frame.mshDispelIndicator:Hide()

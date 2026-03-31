@@ -5,6 +5,39 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 local isSetting = false
 local auraSpellIDCache = setmetatable({}, { __mode = "k" })
+local auraDispelTypeBySpellID = {}
+local knownDispelTypes = { "Magic", "Curse", "Disease", "Poison", "Bleed" }
+local dispelTypeAliases
+local SafeEquals
+
+local function BuildDispelTypeAliases()
+    local aliases = {
+        Magic = { "Magic", "magic", 8 },
+        Disease = { "Disease", "disease", 16 },
+        Curse = { "Curse", "curse", 32 },
+        Poison = { "Poison", "poison", 64 },
+        Bleed = { "Bleed", "bleed" },
+    }
+
+    local localizedTypes = {
+        Magic = _G and _G.DEBUFF_TYPE_MAGIC,
+        Disease = _G and _G.DEBUFF_TYPE_DISEASE,
+        Curse = _G and _G.DEBUFF_TYPE_CURSE,
+        Poison = _G and _G.DEBUFF_TYPE_POISON,
+        Bleed = _G and _G.DEBUFF_TYPE_BLEED,
+    }
+
+    for dispelType, localizedName in pairs(localizedTypes) do
+        if type(localizedName) == "string" and localizedName ~= "" then
+            table.insert(aliases[dispelType], localizedName)
+            table.insert(aliases[dispelType], string.lower(localizedName))
+        end
+    end
+
+    return aliases
+end
+
+dispelTypeAliases = BuildDispelTypeAliases()
 
 local function IsManagedAuraFrame(frame)
     return frame and msh.GetConfigForFrame and msh.GetConfigForFrame(frame) ~= nil
@@ -24,36 +57,65 @@ local function GetAuraCacheBucket(frame)
     return bucket
 end
 
-local function CacheAuraSpellID(frame, auraInstanceID, spellID)
-    if not auraInstanceID or not spellID then
-        return
-    end
-
-    local bucket = GetAuraCacheBucket(frame)
-    if bucket then
-        bucket[auraInstanceID] = spellID
-    end
-end
-
-local function GetCachedAuraSpellID(frame, auraInstanceID)
+local function GetCachedAuraEntry(frame, auraInstanceID)
     if not auraInstanceID then
-        return nil
+        return
     end
 
     local bucket = GetAuraCacheBucket(frame)
     return bucket and bucket[auraInstanceID] or nil
 end
 
-local function ClearCachedAuraSpellID(frame, auraInstanceID)
+local function CacheAuraData(frame, auraInstanceID, spellID, dispelType)
+    if not auraInstanceID then
+        return
+    end
+
+    local bucket = GetAuraCacheBucket(frame)
+    if bucket then
+        local entry = bucket[auraInstanceID]
+        if not entry then
+            entry = {}
+            bucket[auraInstanceID] = entry
+        end
+
+        if spellID then
+            entry.spellID = spellID
+        end
+
+        if dispelType then
+            entry.dispelType = dispelType
+        end
+    end
+end
+
+local function GetCachedAuraSpellID(frame, auraInstanceID)
+    local entry = GetCachedAuraEntry(frame, auraInstanceID)
+    return entry and entry.spellID or nil
+end
+
+local function GetCachedAuraDispelType(frame, auraInstanceID)
+    local entry = GetCachedAuraEntry(frame, auraInstanceID)
+    return entry and entry.dispelType or nil
+end
+
+local function ClearCachedAuraData(frame, auraInstanceID)
     local bucket = GetAuraCacheBucket(frame)
     if bucket and auraInstanceID then
         bucket[auraInstanceID] = nil
+    end
+
+    if frame and frame.mshLastDispelAuraInstanceID and SafeEquals(frame.mshLastDispelAuraInstanceID, auraInstanceID) then
+        frame.mshLastDispelAuraInstanceID = nil
+        frame.mshLastDispelType = nil
     end
 end
 
 local function ClearAuraCache(frame)
     if frame then
         auraSpellIDCache[frame] = nil
+        frame.mshLastDispelAuraInstanceID = nil
+        frame.mshLastDispelType = nil
     end
 end
 
@@ -68,31 +130,154 @@ local function UpdateCooldownFont(button, fontPath, size)
     end
 end
 
-local function TrackAuraSpellID(button, aura)
+SafeEquals = function(left, right)
+    local ok, matches = pcall(function()
+        return left == right
+    end)
+
+    return ok and matches
+end
+
+local function GetDispelValueToken(value)
+    if value == nil then
+        return nil
+    end
+
+    local ok, token = pcall(function()
+        local textValue = tostring(value)
+        if type(textValue) ~= "string" or textValue == "" then
+            return nil
+        end
+
+        local plainValue = string.format("%s", textValue)
+        if type(plainValue) ~= "string" or plainValue == "" then
+            return nil
+        end
+
+        return string.lower(plainValue)
+    end)
+
+    if ok and type(token) == "string" and token ~= "" then
+        return token
+    end
+
+    return nil
+end
+
+local function GetDispelValueText(value)
+    if value == nil then
+        return nil
+    end
+
+    local ok, textValue = pcall(function()
+        local coercedValue = string.format("%s", value)
+        if type(coercedValue) ~= "string" or coercedValue == "" then
+            return nil
+        end
+
+        return coercedValue
+    end)
+
+    if ok and type(textValue) == "string" and textValue ~= "" then
+        return textValue
+    end
+
+    return nil
+end
+
+local function GetStableValueKey(value)
+    local textValue = GetDispelValueText(value)
+    if textValue and textValue ~= "" then
+        return textValue
+    end
+
+    return nil
+end
+
+local function NormalizeAuraDispelType(value)
+    local token = GetDispelValueToken(value)
+    if not token then
+        return nil
+    end
+
+    for _, dispelType in ipairs(knownDispelTypes) do
+        local aliases = dispelTypeAliases[dispelType]
+        if aliases then
+            for _, alias in ipairs(aliases) do
+                local aliasToken = string.lower(tostring(alias))
+                local ok, matches = pcall(function()
+                    return aliasToken and string.find(token, aliasToken, 1, true) ~= nil
+                end)
+                if ok and matches then
+                    return dispelType
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function IsAuraButtonFrame(frame)
+    return type(frame) == "table" and frame.IsObjectType and frame:IsObjectType("Frame") and
+        (frame.icon ~= nil or frame.Icon ~= nil or frame.cooldown ~= nil or frame.border ~= nil or frame.IconBorder ~= nil)
+end
+
+local function IsDispelDebuffButton(parent, button)
+    if not parent or not button or not parent.dispelDebuffFrames then
+        return false
+    end
+
+    for i = 1, #parent.dispelDebuffFrames do
+        if SafeEquals(parent.dispelDebuffFrames[i], button) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function TrackAuraSpellID(button, aura, explicitDispelType)
     if not button then return end
 
+    local parent = button:GetParent()
+    if not IsManagedAuraFrame(parent) then
+        return
+    end
+
+    local auraInstanceID = button.auraInstanceID or button.mshAuraInstanceID
+    local spellID
+    local dispelText = GetDispelValueText(explicitDispelType)
+    local dispelType = NormalizeAuraDispelType(dispelText)
+
     if type(aura) == "table" then
-        local parent = button:GetParent()
-        if not IsManagedAuraFrame(parent) then
-            return
+        auraInstanceID = aura.auraInstanceID or auraInstanceID
+        spellID = aura.spellId or aura.spellID
+        dispelText = dispelText or GetDispelValueText(aura.dispelName) or GetDispelValueText(aura.dispelType) or
+            GetDispelValueText(aura.debuffType)
+        dispelType = dispelType or NormalizeAuraDispelType(dispelText)
+    end
+
+    if auraInstanceID then
+        CacheAuraData(parent, auraInstanceID, spellID, dispelType)
+        spellID = spellID or GetCachedAuraSpellID(parent, auraInstanceID)
+        dispelType = dispelType or GetCachedAuraDispelType(parent, auraInstanceID)
+    end
+
+    if spellID and dispelType then
+        local cacheKey = GetStableValueKey(spellID)
+        if cacheKey then
+            auraDispelTypeBySpellID[cacheKey] = dispelType
         end
+    end
 
-        local auraInstanceID = aura.auraInstanceID
-        local spellID = aura.spellId or aura.spellID
+    button.mshAuraInstanceID = auraInstanceID
+    button.mshSpellID = spellID
+    button.mshDispelType = dispelType or dispelText
 
-        button.mshAuraInstanceID = auraInstanceID
-        if spellID then
-            CacheAuraSpellID(parent, auraInstanceID, spellID)
-        else
-            spellID = GetCachedAuraSpellID(parent, auraInstanceID)
-        end
-
-        button.mshSpellID = spellID
-        button.mshDispelType = aura.dispelName or aura.dispelType or aura.debuffType
-    else
-        button.mshSpellID = nil
-        button.mshAuraInstanceID = nil
-        button.mshDispelType = nil
+    if dispelType and IsDispelDebuffButton(parent, button) then
+        parent.mshLastDispelType = dispelType
+        parent.mshLastDispelAuraInstanceID = auraInstanceID
     end
 end
 
@@ -121,23 +306,53 @@ function msh.GetAuraDispelType(icon)
         return nil
     end
 
-    return icon.mshDispelType or icon.dispelName or icon.dispelType or icon.debuffType
+    local dispelType = NormalizeAuraDispelType(GetDispelValueText(icon.mshDispelType)) or
+        NormalizeAuraDispelType(GetDispelValueText(icon.dispelName)) or
+        NormalizeAuraDispelType(GetDispelValueText(icon.dispelType)) or
+        NormalizeAuraDispelType(GetDispelValueText(icon.debuffType))
+
+    if dispelType then
+        return dispelType
+    end
+
+    local auraInstanceID = icon.mshAuraInstanceID or icon.auraInstanceID
+    if auraInstanceID then
+        dispelType = GetCachedAuraDispelType(icon:GetParent(), auraInstanceID)
+        if dispelType then
+            return dispelType
+        end
+    end
+
+    local spellID = GetAuraSpellID(icon)
+    if not spellID then
+        return nil
+    end
+
+    local cacheKey = GetStableValueKey(spellID)
+    return cacheKey and auraDispelTypeBySpellID[cacheKey] or nil
 end
 
 local function ResolveAuraHookArgs(...)
     local button
     local aura
+    local dispelType
 
     for i = 1, select("#", ...) do
         local arg = select(i, ...)
-        if not button and type(arg) == "table" and arg.IsObjectType and arg:IsObjectType("Frame") then
-            button = arg
+        if type(arg) == "table" and arg.IsObjectType and arg:IsObjectType("Frame") then
+            if IsAuraButtonFrame(arg) then
+                button = arg
+            elseif not button then
+                button = arg
+            end
         elseif not aura and type(arg) == "table" and (arg.auraInstanceID or arg.spellId or arg.spellID or arg.dispelName or arg.dispelType or arg.debuffType) then
             aura = arg
+        elseif not dispelType then
+            dispelType = NormalizeAuraDispelType(GetDispelValueText(arg))
         end
     end
 
-    return button, aura
+    return button, aura, dispelType
 end
 
 if CompactUnitFrame_UtilSetBuff then
@@ -156,8 +371,8 @@ end
 
 if CompactUnitFrame_UtilSetDispelDebuff then
     hooksecurefunc("CompactUnitFrame_UtilSetDispelDebuff", function(...)
-        local dispellDebuffFrame, aura = ResolveAuraHookArgs(...)
-        TrackAuraSpellID(dispellDebuffFrame, aura)
+        local dispellDebuffFrame, aura, dispelType = ResolveAuraHookArgs(...)
+        TrackAuraSpellID(dispellDebuffFrame, aura, dispelType)
     end)
 end
 
@@ -173,7 +388,7 @@ if CompactUnitFrame_UpdateAuras then
 
         if unitAuraUpdateInfo.removedAuraInstanceIDs then
             for _, auraInstanceID in ipairs(unitAuraUpdateInfo.removedAuraInstanceIDs) do
-                ClearCachedAuraSpellID(frame, auraInstanceID)
+                ClearCachedAuraData(frame, auraInstanceID)
             end
         end
     end)

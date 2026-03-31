@@ -1155,6 +1155,24 @@ local function GetUnitGroups(path)
                         },
                     }
                 },
+                predictionPreview = {
+                    type = "execute",
+                    name = function()
+                        if msh.IsPredictionPreviewEnabled and msh.IsPredictionPreviewEnabled(path) then
+                            return L["Скрыть тест полос"]
+                        end
+
+                        return L["Показать тест полос"]
+                    end,
+                    desc = L["Показывает тестовые полосы щита и поглощения исцеления для настройки."],
+                    order = 40,
+                    func = function()
+                        if msh.TogglePredictionPreview then
+                            msh.TogglePredictionPreview(path)
+                            msh:Refresh()
+                        end
+                    end,
+                },
             }
         },
         auras = {

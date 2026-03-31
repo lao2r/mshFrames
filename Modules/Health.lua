@@ -3,6 +3,7 @@ local msh = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 
 local isUpdating = false
+local predictionPreviewState = setmetatable({}, { __mode = "k" })
 local defaultHealAbsorbColor = { r = 0.45, g = 0.12, b = 0.12, a = 0.9 }
 local defaultShieldColor = { r = 0.18, g = 0.62, b = 0.85, a = 0.9 }
 
@@ -69,6 +70,18 @@ local function EnsurePredictionOverlays(frame)
     frame.mshPredictionCreated = true
 end
 
+function msh.IsPredictionPreviewEnabled(cfg)
+    return cfg and predictionPreviewState[cfg] == true or false
+end
+
+function msh.TogglePredictionPreview(cfg)
+    if not cfg then
+        return
+    end
+
+    predictionPreviewState[cfg] = not predictionPreviewState[cfg]
+end
+
 local function ConfigurePredictionBar(bar, texturePath, r, g, b, a, side)
     if not bar then return end
 
@@ -99,6 +112,23 @@ local function UpdatePredictionBar(frame, bar, value, shouldShow)
 
     local minHealth, maxHealth = frame.healthBar:GetMinMaxValues()
     bar:SetMinMaxValues(minHealth, maxHealth)
+    bar:SetValue(value)
+    bar:Show()
+end
+
+local function UpdatePreviewPredictionBar(frame, bar, side, value)
+    if not frame or not frame.healthBar or not bar then return end
+
+    bar:ClearAllPoints()
+    bar:SetAllPoints(frame.healthBar)
+
+    if bar.SetFillStyle and Enum and Enum.StatusBarFillStyle then
+        bar:SetFillStyle(side == "RIGHT" and Enum.StatusBarFillStyle.Reverse or Enum.StatusBarFillStyle.Standard)
+    elseif bar.SetReverseFill then
+        bar:SetReverseFill(side == "RIGHT")
+    end
+
+    bar:SetMinMaxValues(0, 100)
     bar:SetValue(value)
     bar:Show()
 end
@@ -198,6 +228,12 @@ function msh.UpdateHealthPredictionDisplay(frame)
     HidePredictionDecorations(frame)
     HideTexture(frame.myHealAbsorb)
     HideTexture(frame.totalAbsorb)
+
+    if msh.IsPredictionPreviewEnabled(cfg) then
+        UpdatePreviewPredictionBar(frame, frame.mshHealAbsorbBar, cfg.healAbsorbSide or "LEFT", 22)
+        UpdatePreviewPredictionBar(frame, frame.mshShieldBar, cfg.shieldSide or "RIGHT", 36)
+        return
+    end
 
     if not unit then
         frame.mshHealAbsorbBar:Hide()

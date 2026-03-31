@@ -108,6 +108,10 @@ L["mshFrames"] = "mshFrames"
 L["Здоровье"] = "Health"
 L["Полоса поглощения исцеления"] = "Heal Absorb Bar"
 L["Полоса щитов"] = "Shield Bar"
+L["Показать тест полос"] = "Show Bar Preview"
+L["Скрыть тест полос"] = "Hide Bar Preview"
+L["Показывает тестовые полосы щита и поглощения исцеления для настройки."] =
+"Shows preview shield and heal absorb bars for visual tuning."
 L["Сторона"] = "Side"
 L["Вы уверены, что хотите перезаписать текущий профиль этими настройками?"] =
 "Are you sure you want to overwrite the current profile with these settings?"

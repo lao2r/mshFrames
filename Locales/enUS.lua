@@ -119,6 +119,8 @@ L["Показывает рамку вокруг фрейма при наличи
 "Shows a border around the frame when a dispellable debuff is present."
 L["Стиль рамки"] = "Border Style"
 L["Толщина"] = "Thickness"
+L["Длина штриха"] = "Dash Length"
+L["Промежуток"] = "Gap"
 L["Тип предпросмотра"] = "Preview Type"
 L["Показать тест рамки диспела"] = "Show Dispel Border Preview"
 L["Скрыть тест рамки диспела"] = "Hide Dispel Border Preview"

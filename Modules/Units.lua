@@ -328,7 +328,7 @@ local function GetFrameDispelType(frame)
     return nil
 end
 
-local function ApplyPixelDispelOverlay(frame, r, g, b, a, thickness)
+local function ApplyPixelDispelOverlay(frame, r, g, b, a, thickness, dashLength, dashGap)
     local overlay = frame and frame.mshDispelOverlayFrame
     if not overlay then
         return
@@ -338,8 +338,8 @@ local function ApplyPixelDispelOverlay(frame, r, g, b, a, thickness)
     HideEdgeSet(overlay.solidEdges)
 
     local dashThickness = math.max(1, thickness)
-    local dashLength = math.max(4, dashThickness * 3)
-    local dashGap = math.max(2, dashThickness * 2)
+    dashLength = math.max(2, dashLength or (dashThickness * 3))
+    dashGap = math.max(1, dashGap or (dashThickness * 2))
 
     for side, textures in pairs(overlay.pixelEdges or {}) do
         for _, texture in ipairs(textures) do
@@ -436,6 +436,8 @@ local function UpdateDispelOverlay(frame, cfg, activeDispelIcon, globalMode, had
 
     local thickness = math.max(1, math.floor(cfg.dispelOverlayThickness or 2))
     local style = cfg.dispelOverlayStyle or "SOLID"
+    local dashLength = math.max(2, math.floor(cfg.dispelOverlayDashLength or math.max(4, thickness * 3)))
+    local dashGap = math.max(1, math.floor(cfg.dispelOverlayDashGap or math.max(2, thickness * 2)))
     a = a or 0.95
 
     if frame.DispelOverlay and frame.DispelOverlay.SetAlpha then
@@ -447,7 +449,7 @@ local function UpdateDispelOverlay(frame, cfg, activeDispelIcon, globalMode, had
     end
 
     if style == "PIXEL" then
-        ApplyPixelDispelOverlay(frame, r, g, b, a, thickness)
+        ApplyPixelDispelOverlay(frame, r, g, b, a, thickness, dashLength, dashGap)
     else
         ApplySolidDispelOverlay(frame, r, g, b, a, thickness)
     end

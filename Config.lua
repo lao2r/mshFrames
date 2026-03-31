@@ -788,10 +788,40 @@ local function GetUnitGroups(path)
                 path.dispelOverlayThickness = v; msh:Refresh()
             end,
         },
+        dispelOverlayDashLength = {
+            type = "range",
+            name = L["Длина штриха"],
+            order = 19,
+            min = 2,
+            max = 24,
+            step = 1,
+            disabled = function() return (path.dispelOverlayStyle or "SOLID") ~= "PIXEL" end,
+            get = function()
+                return path.dispelOverlayDashLength or 6
+            end,
+            set = function(_, v)
+                path.dispelOverlayDashLength = v; msh:Refresh()
+            end,
+        },
+        dispelOverlayDashGap = {
+            type = "range",
+            name = L["Промежуток"],
+            order = 20,
+            min = 1,
+            max = 24,
+            step = 1,
+            disabled = function() return (path.dispelOverlayStyle or "SOLID") ~= "PIXEL" end,
+            get = function()
+                return path.dispelOverlayDashGap or 4
+            end,
+            set = function(_, v)
+                path.dispelOverlayDashGap = v; msh:Refresh()
+            end,
+        },
         dispelOverlayPreviewType = {
             type = "select",
             name = L["Тип предпросмотра"],
-            order = 19,
+            order = 21,
             values = dispelPreviewTypes,
             get = function()
                 return path.dispelOverlayPreviewType or "Magic"
@@ -810,7 +840,7 @@ local function GetUnitGroups(path)
                 return L["Показать тест рамки диспела"]
             end,
             desc = L["Показывает тестовую рамку диспела без реального дебаффа."],
-            order = 20,
+            order = 22,
             func = function()
                 if msh.ToggleDispelOverlayPreview then
                     msh.ToggleDispelOverlayPreview(path)
@@ -821,7 +851,7 @@ local function GetUnitGroups(path)
         dispelOverlayColors = {
             type = "group",
             name = L["Цвета рамки"],
-            order = 21,
+            order = 23,
             inline = true,
             args = {
                 dispelOverlayMagicColor = {
@@ -1599,6 +1629,8 @@ local defaultProfile = {
     dispelIndicatorY = 5,
     dispelOverlayStyle = "SOLID",
     dispelOverlayThickness = 2,
+    dispelOverlayDashLength = 6,
+    dispelOverlayDashGap = 4,
     dispelOverlayPreviewType = "Magic",
     dispelOverlayMagicColor = { r = 0.20, g = 0.60, b = 1.00, a = 0.95 },
     dispelOverlayCurseColor = { r = 0.60, g = 0.00, b = 1.00, a = 0.95 },

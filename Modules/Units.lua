@@ -21,10 +21,24 @@ function msh.CreateUnitLayers(frame)
     frame.mshName = frame.mshTextLayer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall", 8)
     if frame.name then frame.name:SetAlpha(0) end
 
-    frame.mshRole = frame:CreateTexture(nil, "OVERLAY", nil, 5)
-    frame.mshRaidIcon = frame:CreateTexture(nil, "OVERLAY", nil, 5)
-    frame.mshLeader = frame:CreateTexture(nil, "OVERLAY", nil, 5)
-    frame.mshDispelIndicator = frame:CreateTexture(nil, "OVERLAY", nil, 5)
+    frame.mshRole = frame.mshTextLayer:CreateTexture(nil, "OVERLAY", nil, 5)
+    frame.mshRaidIcon = frame.mshTextLayer:CreateTexture(nil, "OVERLAY", nil, 5)
+    frame.mshLeader = frame.mshTextLayer:CreateTexture(nil, "OVERLAY", nil, 5)
+    frame.mshDispelIndicator = frame.mshTextLayer:CreateTexture(nil, "OVERLAY", nil, 5)
+
+    if frame.roleIcon then
+        frame.roleIcon:SetParent(frame.mshTextLayer)
+        frame.roleIcon:SetDrawLayer("OVERLAY", 5)
+    end
+
+    if frame.DispelOverlay then
+        frame.DispelOverlay:SetParent(frame.mshTextLayer)
+        frame.DispelOverlay:SetFrameStrata(frame.mshTextLayer:GetFrameStrata())
+        frame.DispelOverlay:SetFrameLevel(frame.mshTextLayer:GetFrameLevel() + 1)
+        frame.DispelOverlay:ClearAllPoints()
+        frame.DispelOverlay:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT")
+        frame.DispelOverlay:SetPoint("BOTTOMRIGHT", frame.healthBar, "BOTTOMRIGHT")
+    end
 
     if frame.leaderIcon then frame.leaderIcon:SetAlpha(0) end
 

@@ -103,6 +103,35 @@ local function UpdatePredictionBar(frame, bar, value, shouldShow)
     bar:Show()
 end
 
+local function UpdateHealAbsorbBar(frame, bar, nativeBar, side, shouldShow)
+    if not frame or not frame.healthBar or not bar then return end
+
+    if not shouldShow or not nativeBar then
+        bar:Hide()
+        return
+    end
+
+    local width = nativeBar:GetWidth() or 0
+    if width <= 0 then
+        bar:Hide()
+        return
+    end
+
+    bar:ClearAllPoints()
+    if side == "RIGHT" then
+        bar:SetPoint("TOPRIGHT", frame.healthBar, "TOPRIGHT", 0, 0)
+        bar:SetPoint("BOTTOMRIGHT", frame.healthBar, "BOTTOMRIGHT", 0, 0)
+    else
+        bar:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT", 0, 0)
+        bar:SetPoint("BOTTOMLEFT", frame.healthBar, "BOTTOMLEFT", 0, 0)
+    end
+
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(1)
+    bar:SetWidth(width)
+    bar:Show()
+end
+
 function msh.CreateHealthLayers(frame)
     if not msh.db or not msh.db.profile then return end
     if frame.mshHealthCreated then return end
@@ -176,7 +205,7 @@ function msh.UpdateHealthPredictionDisplay(frame)
         return
     end
 
-    UpdatePredictionBar(frame, frame.mshHealAbsorbBar, UnitGetTotalHealAbsorbs(unit), showHealAbsorb)
+    UpdateHealAbsorbBar(frame, frame.mshHealAbsorbBar, frame.myHealAbsorb, cfg.healAbsorbSide or "LEFT", showHealAbsorb)
     UpdatePredictionBar(frame, frame.mshShieldBar, UnitGetTotalAbsorbs(unit), showShield)
 end
 

@@ -112,6 +112,23 @@ L["Показать тест полос"] = "Show Bar Preview"
 L["Скрыть тест полос"] = "Hide Bar Preview"
 L["Показывает тестовые полосы щита и поглощения исцеления для настройки."] =
 "Shows preview shield and heal absorb bars for visual tuning."
+L["Сплошная"] = "Solid"
+L["Pixel Glow"] = "Pixel Glow"
+L["Рамка диспела"] = "Dispel Border"
+L["Показывает рамку вокруг фрейма при наличии рассеиваемого дебаффа."] =
+"Shows a border around the frame when a dispellable debuff is present."
+L["Стиль рамки"] = "Border Style"
+L["Толщина"] = "Thickness"
+L["Тип предпросмотра"] = "Preview Type"
+L["Показать тест рамки диспела"] = "Show Dispel Border Preview"
+L["Скрыть тест рамки диспела"] = "Hide Dispel Border Preview"
+L["Показывает тестовую рамку диспела без реального дебаффа."] =
+"Shows a dispel border preview without a real debuff."
+L["Цвета рамки"] = "Border Colors"
+L["Магия"] = "Magic"
+L["Проклятие"] = "Curse"
+L["Болезнь"] = "Disease"
+L["Яд"] = "Poison"
 L["Сторона"] = "Side"
 L["Вы уверены, что хотите перезаписать текущий профиль этими настройками?"] =
 "Are you sure you want to overwrite the current profile with these settings?"

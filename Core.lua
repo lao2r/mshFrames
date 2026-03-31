@@ -173,6 +173,9 @@ end)
 hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
     if frame.mshLayersCreated and msh.UpdateAuras then
         msh.UpdateAuras(frame)
+        if msh.UpdateUnitDisplay then
+            msh.UpdateUnitDisplay(frame)
+        end
     end
 end)
 

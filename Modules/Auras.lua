@@ -88,9 +88,11 @@ local function TrackAuraSpellID(button, aura)
         end
 
         button.mshSpellID = spellID
+        button.mshDispelType = aura.dispelName or aura.dispelType or aura.debuffType
     else
         button.mshSpellID = nil
         button.mshAuraInstanceID = nil
+        button.mshDispelType = nil
     end
 end
 
@@ -112,6 +114,14 @@ end
 
 function msh.GetAuraSpellID(icon)
     return GetAuraSpellID(icon)
+end
+
+function msh.GetAuraDispelType(icon)
+    if not icon then
+        return nil
+    end
+
+    return icon.mshDispelType or icon.dispelName or icon.dispelType or icon.debuffType
 end
 
 if CompactUnitFrame_UtilSetBuff then

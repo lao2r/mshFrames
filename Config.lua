@@ -45,6 +45,16 @@ local absorbSides = {
     ["LEFT"] = L["Слева"],
     ["RIGHT"] = L["Справа"],
 }
+local dispelOverlayStyles = {
+    ["SOLID"] = L["Сплошная"],
+    ["PIXEL"] = L["Pixel Glow"],
+}
+local dispelPreviewTypes = {
+    ["Magic"] = L["Магия"],
+    ["Curse"] = L["Проклятие"],
+    ["Disease"] = L["Болезнь"],
+    ["Poison"] = L["Яд"],
+}
 
 local function GetColorValue(path, field, fallback)
     local color = path[field]
@@ -740,7 +750,134 @@ local function GetUnitGroups(path)
                 path.dispelIndicatorY = v; msh:Refresh()
             end
         },
+        dispelIndicatorOverlay = {
+            type = "toggle",
+            name = L["Рамка диспела"],
+            desc = L["Показывает рамку вокруг фрейма при наличии рассеиваемого дебаффа."],
+            order = 16,
+            get = function()
+                return path.dispelIndicatorOverlay ~= false
+            end,
+            set = function(_, v)
+                path.dispelIndicatorOverlay = v; msh:Refresh()
+            end,
+        },
+        dispelOverlayStyle = {
+            type = "select",
+            name = L["Стиль рамки"],
+            order = 17,
+            values = dispelOverlayStyles,
+            get = function()
+                return path.dispelOverlayStyle or "SOLID"
+            end,
+            set = function(_, v)
+                path.dispelOverlayStyle = v; msh:Refresh()
+            end,
+        },
+        dispelOverlayThickness = {
+            type = "range",
+            name = L["Толщина"],
+            order = 18,
+            min = 1,
+            max = 6,
+            step = 1,
+            get = function()
+                return path.dispelOverlayThickness or 2
+            end,
+            set = function(_, v)
+                path.dispelOverlayThickness = v; msh:Refresh()
+            end,
+        },
+        dispelOverlayPreviewType = {
+            type = "select",
+            name = L["Тип предпросмотра"],
+            order = 19,
+            values = dispelPreviewTypes,
+            get = function()
+                return path.dispelOverlayPreviewType or "Magic"
+            end,
+            set = function(_, v)
+                path.dispelOverlayPreviewType = v; msh:Refresh()
+            end,
+        },
+        dispelOverlayPreview = {
+            type = "execute",
+            name = function()
+                if msh.IsDispelOverlayPreviewEnabled and msh.IsDispelOverlayPreviewEnabled(path) then
+                    return L["Скрыть тест рамки диспела"]
+                end
 
+                return L["Показать тест рамки диспела"]
+            end,
+            desc = L["Показывает тестовую рамку диспела без реального дебаффа."],
+            order = 20,
+            func = function()
+                if msh.ToggleDispelOverlayPreview then
+                    msh.ToggleDispelOverlayPreview(path)
+                    msh:Refresh()
+                end
+            end,
+        },
+        dispelOverlayColors = {
+            type = "group",
+            name = L["Цвета рамки"],
+            order = 21,
+            inline = true,
+            args = {
+                dispelOverlayMagicColor = {
+                    type = "color",
+                    name = L["Магия"],
+                    hasAlpha = true,
+                    order = 1,
+                    get = function()
+                        return GetColorValue(path, "dispelOverlayMagicColor", { r = 0.20, g = 0.60, b = 1.00, a = 0.95 })
+                    end,
+                    set = function(_, r, g, b, a)
+                        SetColorValue(path, "dispelOverlayMagicColor", r, g, b, a)
+                        msh:Refresh()
+                    end,
+                },
+                dispelOverlayCurseColor = {
+                    type = "color",
+                    name = L["Проклятие"],
+                    hasAlpha = true,
+                    order = 2,
+                    get = function()
+                        return GetColorValue(path, "dispelOverlayCurseColor", { r = 0.60, g = 0.00, b = 1.00, a = 0.95 })
+                    end,
+                    set = function(_, r, g, b, a)
+                        SetColorValue(path, "dispelOverlayCurseColor", r, g, b, a)
+                        msh:Refresh()
+                    end,
+                },
+                dispelOverlayDiseaseColor = {
+                    type = "color",
+                    name = L["Болезнь"],
+                    hasAlpha = true,
+                    order = 3,
+                    get = function()
+                        return GetColorValue(path, "dispelOverlayDiseaseColor", { r = 0.75, g = 0.55, b = 0.20, a = 0.95 })
+                    end,
+                    set = function(_, r, g, b, a)
+                        SetColorValue(path, "dispelOverlayDiseaseColor", r, g, b, a)
+                        msh:Refresh()
+                    end,
+                },
+                dispelOverlayPoisonColor = {
+                    type = "color",
+                    name = L["Яд"],
+                    hasAlpha = true,
+                    order = 4,
+                    get = function()
+                        return GetColorValue(path, "dispelOverlayPoisonColor", { r = 0.00, g = 0.85, b = 0.20, a = 0.95 })
+                    end,
+                    set = function(_, r, g, b, a)
+                        SetColorValue(path, "dispelOverlayPoisonColor", r, g, b, a)
+                        msh:Refresh()
+                    end,
+                },
+            },
+        },
     }
     local bigSaveArgs = {
         showBigSaveTimer = {
@@ -1460,6 +1597,13 @@ local defaultProfile = {
     dispelIndicatorPoint = "TOPRIGHT",
     dispelIndicatorX = 5,
     dispelIndicatorY = 5,
+    dispelOverlayStyle = "SOLID",
+    dispelOverlayThickness = 2,
+    dispelOverlayPreviewType = "Magic",
+    dispelOverlayMagicColor = { r = 0.20, g = 0.60, b = 1.00, a = 0.95 },
+    dispelOverlayCurseColor = { r = 0.60, g = 0.00, b = 1.00, a = 0.95 },
+    dispelOverlayDiseaseColor = { r = 0.75, g = 0.55, b = 0.20, a = 0.95 },
+    dispelOverlayPoisonColor = { r = 0.00, g = 0.85, b = 0.20, a = 0.95 },
 
     showBigSave = true,
     useBlizzBigSave = true,

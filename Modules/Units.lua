@@ -386,6 +386,44 @@ local function GetDispelTypeForIcon(icon)
     )
 end
 
+local function GetPreviewDispelIconVisual(cfg)
+    local previewType = NormalizeDispelType(cfg and cfg.dispelOverlayPreviewType) or "Magic"
+
+    if previewType == "Curse" then
+        return "icons_16x16_curse", nil
+    elseif previewType == "Disease" then
+        return "icons_16x16_disease", nil
+    elseif previewType == "Poison" then
+        return "icons_16x16_poison", nil
+    end
+
+    return "icons_16x16_magic", nil
+end
+
+local function ShowDispelIndicator(frame, cfg, atlasName, texturePath)
+    if not frame or not frame.mshDispelIndicator then
+        return false
+    end
+
+    if atlasName then
+        frame.mshDispelIndicator:SetAtlas(atlasName)
+    elseif texturePath then
+        frame.mshDispelIndicator:SetTexture(texturePath)
+    else
+        frame.mshDispelIndicator:Hide()
+        return false
+    end
+
+    local size = cfg.dispelIndicatorSize or 18
+    frame.mshDispelIndicator:SetSize(size, size)
+    frame.mshDispelIndicator:SetAlpha(cfg.dispelIndicatorAlpha or 1)
+    frame.mshDispelIndicator:ClearAllPoints()
+    frame.mshDispelIndicator:SetPoint(cfg.dispelIndicatorPoint or "TOPRIGHT", frame, cfg.dispelIndicatorX or 0,
+        cfg.dispelIndicatorY or 0)
+    frame.mshDispelIndicator:Show()
+    return true
+end
+
 function msh.IsDispelOverlayPreviewEnabled(cfg)
     return cfg and dispelOverlayPreviewState[cfg] == true or false
 end
@@ -564,6 +602,7 @@ function msh.UpdateUnitDisplay(frame)
 
     if frame.mshDispelIndicator then
         local globalMode = "0"
+        local previewEnabled = msh.IsDispelOverlayPreviewEnabled and msh.IsDispelOverlayPreviewEnabled(cfg)
         if msh.db and msh.db.profile and msh.db.profile.global then
             globalMode = msh.db.profile.global.dispelIndicatorMode or "0"
         end
@@ -580,26 +619,27 @@ function msh.UpdateUnitDisplay(frame)
         local blizzIcon, hadShownDispel = GetActiveDispelIcon(frame, cfg)
         UpdateDispelOverlay(frame, cfg, blizzIcon, globalMode, hadShownDispel)
 
-        if globalMode == "0" then
+        if cfg.showDispelIndicator == false then
+            frame.mshDispelIndicator:Hide()
+        elseif previewEnabled then
+            local previewAtlas, previewTexture = GetPreviewDispelIconVisual(cfg)
+            if ShowDispelIndicator(frame, cfg, previewAtlas, previewTexture) then
+                if blizzIcon then
+                    blizzIcon:SetAlpha(0)
+                end
+            else
+                frame.mshDispelIndicator:Hide()
+            end
+        elseif globalMode == "0" then
             frame.mshDispelIndicator:Hide()
         else
             if blizzIcon and blizzIcon:IsShown() and blizzIcon.icon then
                 local atlasName = blizzIcon.icon.GetAtlas and blizzIcon.icon:GetAtlas()
-                if atlasName then
-                    frame.mshDispelIndicator:SetAtlas(atlasName)
+                if ShowDispelIndicator(frame, cfg, atlasName, atlasName and nil or blizzIcon.icon:GetTexture()) then
+                    blizzIcon:SetAlpha(0)
                 else
-                    frame.mshDispelIndicator:SetTexture(blizzIcon.icon:GetTexture())
+                    frame.mshDispelIndicator:Hide()
                 end
-
-                local size = cfg.dispelIndicatorSize or 18
-                frame.mshDispelIndicator:SetSize(size, size)
-                frame.mshDispelIndicator:SetAlpha(cfg.dispelIndicatorAlpha or 1)
-                frame.mshDispelIndicator:ClearAllPoints()
-                frame.mshDispelIndicator:SetPoint(cfg.dispelIndicatorPoint or "TOPRIGHT", frame,
-                    cfg.dispelIndicatorX or 0, cfg.dispelIndicatorY or 0)
-
-                frame.mshDispelIndicator:Show()
-                blizzIcon:SetAlpha(0)
             else
                 frame.mshDispelIndicator:Hide()
             end

@@ -672,14 +672,28 @@ local function GetUnitGroups(path)
                 LibStub("AceConfigRegistry-3.0"):NotifyChange("mshFrames")
             end
         },
+        dispelIndicatorIcon = {
+            type = "toggle",
+            name = L["Иконка диспела"],
+            desc = L["Показывает отдельную иконку диспела поверх фрейма."],
+            order = 11,
+            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" end,
+            get = function()
+                return path.showDispelIndicator ~= false
+            end,
+            set = function(_, v)
+                path.showDispelIndicator = v
+                msh:Refresh()
+            end,
+        },
         dispelIndicatorSize = {
             type = "range",
             name = L["Размер"],
-            order = 11,
+            order = 12,
             min = 8,
             max = 40,
             step = 1,
-            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" end,
+            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" or path.showDispelIndicator == false end,
             get = function()
                 return
                     path.dispelIndicatorSize
@@ -694,8 +708,8 @@ local function GetUnitGroups(path)
             min = 0.1,
             max = 1,
             step = 0.1,
-            order = 12,
-            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" end,
+            order = 13,
+            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" or path.showDispelIndicator == false end,
             get = function()
                 return
                     path.dispelIndicatorAlpha
@@ -707,9 +721,9 @@ local function GetUnitGroups(path)
         dispelIndicatorPoint = {
             type = "select",
             name = L["Точка привязки"],
-            order = 13,
+            order = 14,
             values = anchorPoints,
-            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" end,
+            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" or path.showDispelIndicator == false end,
             get = function()
                 return
                     path.dispelIndicatorPoint
@@ -721,11 +735,11 @@ local function GetUnitGroups(path)
         dispelIndicatorX = {
             type = "range",
             name = L["Смещение X"],
-            order = 14,
+            order = 15,
             min = -100,
             max = 100,
             step = 1,
-            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" end,
+            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" or path.showDispelIndicator == false end,
             get = function()
                 return
                     path.dispelIndicatorX
@@ -737,11 +751,11 @@ local function GetUnitGroups(path)
         dispelIndicatorY = {
             type = "range",
             name = L["Смещение Y"],
-            order = 15,
+            order = 16,
             min = -100,
             max = 100,
             step = 1,
-            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" end,
+            disabled = function() return msh.db.profile.global.dispelIndicatorMode == "0" or path.showDispelIndicator == false end,
             get = function()
                 return
                     path.dispelIndicatorY
@@ -754,7 +768,7 @@ local function GetUnitGroups(path)
             type = "toggle",
             name = L["Рамка диспела"],
             desc = L["Показывает рамку вокруг фрейма при наличии рассеиваемого дебаффа."],
-            order = 16,
+            order = 17,
             get = function()
                 return path.dispelIndicatorOverlay ~= false
             end,
@@ -765,7 +779,7 @@ local function GetUnitGroups(path)
         dispelOverlayStyle = {
             type = "select",
             name = L["Стиль рамки"],
-            order = 17,
+            order = 18,
             values = dispelOverlayStyles,
             get = function()
                 return path.dispelOverlayStyle or "SOLID"
@@ -777,7 +791,7 @@ local function GetUnitGroups(path)
         dispelOverlayThickness = {
             type = "range",
             name = L["Толщина"],
-            order = 18,
+            order = 19,
             min = 1,
             max = 6,
             step = 1,
@@ -791,7 +805,7 @@ local function GetUnitGroups(path)
         dispelOverlayDashLength = {
             type = "range",
             name = L["Длина штриха"],
-            order = 19,
+            order = 20,
             min = 2,
             max = 24,
             step = 1,
@@ -806,7 +820,7 @@ local function GetUnitGroups(path)
         dispelOverlayDashGap = {
             type = "range",
             name = L["Промежуток"],
-            order = 20,
+            order = 21,
             min = 1,
             max = 24,
             step = 1,
@@ -821,7 +835,7 @@ local function GetUnitGroups(path)
         dispelOverlayPreviewType = {
             type = "select",
             name = L["Тип предпросмотра"],
-            order = 21,
+            order = 22,
             values = dispelPreviewTypes,
             get = function()
                 return path.dispelOverlayPreviewType or "Magic"
@@ -840,7 +854,7 @@ local function GetUnitGroups(path)
                 return L["Показать тест рамки диспела"]
             end,
             desc = L["Показывает тестовую рамку диспела без реального дебаффа."],
-            order = 22,
+            order = 23,
             func = function()
                 if msh.ToggleDispelOverlayPreview then
                     msh.ToggleDispelOverlayPreview(path)
@@ -851,7 +865,7 @@ local function GetUnitGroups(path)
         dispelOverlayColors = {
             type = "group",
             name = L["Цвета рамки"],
-            order = 23,
+            order = 24,
             inline = true,
             args = {
                 dispelOverlayMagicColor = {

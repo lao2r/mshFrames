@@ -115,6 +115,7 @@ L["Показывает тестовые полосы щита и поглоще
 L["Сплошная"] = "Solid"
 L["Пунктирная"] = "Dashed"
 L["Рамка диспела"] = "Dispel Border"
+L["Показывает отдельную иконку диспела поверх фрейма."] = "Shows a separate dispel icon on top of the frame."
 L["Показывает рамку вокруг фрейма при наличии рассеиваемого дебаффа."] =
 "Shows a border around the frame when a dispellable debuff is present."
 L["Стиль рамки"] = "Border Style"

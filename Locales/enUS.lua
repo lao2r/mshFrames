@@ -1,0 +1,106 @@
+local L = LibStub("AceLocale-3.0"):NewLocale("mshFrames", "enUS", true)
+
+L["ВНИМАНИЕ:"] = "WARNING:"
+L["Требуется /reload для применения настроек."] = "Requires /reload to apply settings."
+
+L["Сверху слева"] = "Top Left"
+L["Сверху"] = "Top"
+L["Сверху справа"] = "Top Right"
+L["Слева"] = "Left"
+L["Центр"] = "Center"
+L["Справа"] = "Right"
+L["Снизу слева"] = "Bottom Left"
+L["Снизу"] = "Bottom"
+L["Снизу справа"] = "Bottom Right"
+
+
+
+L["Нет"] = "None"
+L["Тонкий Красивый"] = "Outline (Nice)"
+L["Тонкий Уродский"] = "Outline"
+L["Жирный"] = "Thick Outline"
+L["Пиксельный"] = "Monochrome"
+
+L["Включить"] = "Enable"
+L["Выключено"] = "Disabled"
+L["Показать Тултип"] = "Show Tooltip"
+L["Показывать описание при наведении на иконку"] = "Show description on hover"
+
+L["Стандартные Blizzard"] = "Blizzard Default"
+L["Кастомные ауры"] = "Custom Auras"
+
+L["Иконка лидера"] = "Leader Icon"
+L["Включить иконку"] = "Enable Icon"
+L["Размер"] = "Size"
+L["Прозрачность"] = "Opacity"
+L["Точка привязки"] = "Anchor Point"
+L["Смещение X"] = "X Offset"
+L["Смещение Y"] = "Y Offset"
+
+L["Внешний вид"] = "Appearance"
+L["Таймер"] = "Timer"
+
+L["Расположение (Кастом)"] = "Position (Custom)"
+L["Рост"] = "Growth"
+L["Отступ"] = "Padding"
+L["Масштаб текста"] = "Text Scale"
+
+L["Важные дебаффы"] = "Important Debuffs"
+L["Показывать большие дебаффы от боссов"] = "Show important debuffs from bosses"
+L["Только рассеиваемые"] = "Only Dispellable"
+L["Показывать только дебаффы, которые можно рассеять"] = "Show only dispellable debuffs"
+L["Размер иконок"] = "Icon Size"
+
+L["Режим отображения"] = "Display Mode"
+L["Выберите тип работы индикатора диспела (CVar)"] = "Select type of dispel indicator (CVars)"
+L["Я могу рассеять"] = "I can dispel"
+L["Показывать все"] = "Show All"
+
+L["Общие"] = "General"
+L["Текстура"] = "Texture"
+L["Заголовки групп"] = "Group Titles"
+L["Показывать названия групп"] = "Show group titles"
+L["Яркость подсветки"] = "Highlight Brightness"
+L["Прозрачность блика при наведении мыши."] = "Mouseover highlight opacity"
+
+L["Имена"] = "Names"
+L["Шрифт"] = "Font"
+L["Глобальный шрифт"] = "Global Font"
+L["Контур"] = "Text Outline"
+L["Длина имени"] = "Name Length"
+
+L["Ауры"] = "Auras"
+L["Баффы"] = "Buffs"
+L["Дебаффы"] = "Debuffs"
+L["Иконка диспела"] = "Dispel Icon"
+L["Центральный Сейв"] = "Big Center Save"
+
+L["Рейдовые метки"] = "Raid Markers"
+L["Иконки ролей"] = "Role Icons"
+L["Полностью отключает кастомизацию ролей и возвращает родные иконки игры."] =
+"Completely disables custom role icons and returns the default ones."
+L["Включить кастомные иконки ролей"] = "Enable custom role icons"
+L["Отображает иконку танка, целителя или урона"] = "Show tank, healer or damage icon"
+L["Танк"] = "Tank"
+L["Хил"] = "Healer"
+L["ДД"] = "DPS"
+L["Устанавливает этот шрифт для всех текстов в аддоне."] = "Sets this font for all text in addon."
+L["Формат данных ХП"] = "Health Format"
+L["Влияет на то, какие данные Blizzard готовит для отображения (CVar)"] =
+"What data Blizzard prepares for display (CVars)"
+L["Цифры"] = "Numbers"
+L["Проценты"] = "Percent"
+L["Скрыть"] = "None"
+L["Цвета классов"] = "Class Colors"
+L["Включает окрашивание фреймов в цвета классов (CVar)"] = "Enables class coloring of frames (CVars)"
+L["Профили"] = "Profiles"
+L["Экспорт профиля"] = "Export Profile"
+L["Экспорт и Импорт (строка)"] = "Export and Import (string)"
+L["Экспорт"] = "Export"
+L["Импорт"] = "Import"
+L["LOAD_MESSAGE"] = "|cff00ff00%s loaded!|r Use |cffffff00%s|r for settings."
+L["mshFrames"] = "mshFrames"
+L["Здоровье"] = "Health"
+L["Вы уверены, что хотите перезаписать текущий профиль этими настройками?"] =
+"Are you sure you want to overwrite the current profile with these settings?"
+L["Включить метки"] = "Enable Markers"

@@ -1,0 +1,30 @@
+## Interface: 120000
+## Title: mshFrames
+## Notes: Blizzard based frames with customs
+## Version: 1.0
+## Author: gudvinka
+## SavedVariables: mshFramesDB
+## IconTexture: Interface\AddOns\mshFrames\Media\logo.tga
+## License: MIT
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\Ace3\AceAddon-3.0\AceAddon-3.0.xml
+Libs\Ace3\AceEvent-3.0\AceEvent-3.0.xml
+Libs\Ace3\AceDB-3.0\AceDB-3.0.xml
+Libs\Ace3\AceDBOptions-3.0\AceDBOptions-3.0.xml
+Libs\Ace3\AceGUI-3.0\AceGUI-3.0.xml
+Libs\Ace3\AceConfig-3.0\AceConfig-3.0.xml
+Libs\LibSharedMedia-3.0\lib.xml
+Libs\AceGUI-3.0-SharedMediaWidgets\widget.xml
+Libs\LibSerialize\LibSerialize.lua
+Libs\LibDeflate\LibDeflate.lua
+
+Locales\enUS.lua
+Locales\ruRU.lua
+Core.lua
+Config.lua
+Parser.lua
+Modules\Units.lua
+Modules\Health.lua
+Modules\Auras.lua

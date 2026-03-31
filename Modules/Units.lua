@@ -2,11 +2,6 @@ local _, ns = ...
 local msh = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 
-local function GetAuraSpellID(icon)
-    if not icon then return nil end
-    return icon.mshSpellID or icon.spellID or icon.spellId
-end
-
 function msh.CreateUnitLayers(frame)
     if frame.mshLayersCreated then return end
 
@@ -115,9 +110,8 @@ function msh.UpdateUnitDisplay(frame)
             frame.mshDispelIndicator:Hide()
         else
             local blizzIcon = frame.dispelDebuffFrames and frame.dispelDebuffFrames[1]
-            local excludedDebuffSpellIDs = msh.GetExcludedSpellIDSet(cfg, "excludedDebuffSpellIDs")
-            local dispelSpellID = GetAuraSpellID(blizzIcon)
-            local isExcluded = excludedDebuffSpellIDs and dispelSpellID and excludedDebuffSpellIDs[dispelSpellID]
+            local dispelSpellID = msh.GetAuraSpellID and msh.GetAuraSpellID(blizzIcon)
+            local isExcluded = msh.IsExcludedSpell and msh.IsExcludedSpell(cfg, "excludedDebuffSpellIDs", dispelSpellID)
 
             if blizzIcon and blizzIcon:IsShown() and blizzIcon.icon and not isExcluded then
                 local atlasName = blizzIcon.icon.GetAtlas and blizzIcon.icon:GetAtlas()

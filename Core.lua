@@ -2,13 +2,28 @@ local addonName, ns = ...
 
 local msh = LibStub("AceAddon-3.0"):NewAddon(ns, addonName, "AceEvent-3.0")
 local spellIDListCache = setmetatable({}, { __mode = "k" })
+local emptyTable = {}
+
+local function GetSpellNameByID(spellID)
+    if C_Spell and C_Spell.GetSpellName then
+        return C_Spell.GetSpellName(spellID)
+    end
+
+    if GetSpellInfo then
+        return GetSpellInfo(spellID)
+    end
+
+    return nil
+end
 
 local function ParseSpellIDList(rawValue)
     local normalizedList = {}
     local spellIDSet = {}
+    local spellNameSet = {}
+    local spellNameList = {}
 
     if type(rawValue) ~= "string" then
-        return nil, ""
+        return nil, nil, ""
     end
 
     for token in rawValue:gmatch("[^,%s;]+") do
@@ -17,24 +32,29 @@ local function ParseSpellIDList(rawValue)
             spellID = math.floor(spellID)
             if spellID > 0 and not spellIDSet[spellID] then
                 spellIDSet[spellID] = true
+                local spellName = GetSpellNameByID(spellID)
+                if spellName and spellName ~= "" and not spellNameSet[spellName] then
+                    spellNameSet[spellName] = true
+                    table.insert(spellNameList, spellName)
+                end
                 table.insert(normalizedList, spellID)
             end
         end
     end
 
     if #normalizedList == 0 then
-        return nil, ""
+        return nil, nil, ""
     end
 
-    return spellIDSet, table.concat(normalizedList, ", ")
+    return normalizedList, spellNameList, table.concat(normalizedList, ", ")
 end
 
 function msh.NormalizeSpellIDList(rawValue)
-    local _, normalized = ParseSpellIDList(rawValue)
+    local _, _, normalized = ParseSpellIDList(rawValue)
     return normalized
 end
 
-function msh.GetExcludedSpellIDSet(cfg, field)
+local function GetExcludedSpellEntry(cfg, field)
     if not cfg or not field then
         return nil
     end
@@ -48,14 +68,54 @@ function msh.GetExcludedSpellIDSet(cfg, field)
     end
 
     if not cacheEntry[field] or cacheEntry[field].rawValue ~= rawValue then
-        local spellIDSet = select(1, ParseSpellIDList(rawValue))
+        local spellIDs, spellNames = ParseSpellIDList(rawValue)
         cacheEntry[field] = {
             rawValue = rawValue,
-            spellIDSet = spellIDSet,
+            spellIDs = spellIDs,
+            spellNames = spellNames,
         }
     end
 
-    return cacheEntry[field].spellIDSet
+    return cacheEntry[field]
+end
+
+function msh.GetExcludedSpellIDSet(cfg, field)
+    local entry = GetExcludedSpellEntry(cfg, field)
+    return entry and entry.spellIDs or nil
+end
+
+function msh.IsExcludedSpell(cfg, field, spellID)
+    if not spellID then
+        return false
+    end
+
+    local entry = GetExcludedSpellEntry(cfg, field)
+    if not entry then
+        return false
+    end
+
+    for _, excludedSpellID in ipairs(entry.spellIDs or emptyTable) do
+        local ok, matches = pcall(function()
+            return spellID == excludedSpellID
+        end)
+        if ok and matches then
+            return true
+        end
+    end
+
+    local okName, spellName = pcall(GetSpellNameByID, spellID)
+    if okName and spellName then
+        for _, excludedSpellName in ipairs(entry.spellNames or emptyTable) do
+            local okMatch, matches = pcall(function()
+                return spellName == excludedSpellName
+            end)
+            if okMatch and matches then
+                return true
+            end
+        end
+    end
+
+    return false
 end
 
 function msh.GetConfigForFrame(frame)

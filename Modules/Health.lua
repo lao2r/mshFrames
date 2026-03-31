@@ -38,17 +38,30 @@ local function HidePredictionDecorations(frame)
     HideTexture(frame.myHealAbsorbRightShadow)
 end
 
+local function EnsureTextLayer(frame)
+    if not frame or frame.mshTextLayer then
+        return
+    end
+
+    frame.mshTextLayer = CreateFrame("Frame", nil, frame)
+    frame.mshTextLayer:SetFrameStrata(frame:GetFrameStrata())
+    frame.mshTextLayer:SetFrameLevel((frame.healthBar and frame.healthBar:GetFrameLevel() or frame:GetFrameLevel()) + 10)
+    frame.mshTextLayer:SetAllPoints(frame)
+end
+
 local function EnsurePredictionOverlays(frame)
     if not frame or not frame.healthBar or frame.mshPredictionCreated then
         return
     end
 
     frame.mshShieldBar = CreateFrame("StatusBar", nil, frame)
+    frame.mshShieldBar:SetFrameStrata(frame:GetFrameStrata())
     frame.mshShieldBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 1)
     frame.mshShieldBar:SetAllPoints(frame.healthBar)
     frame.mshShieldBar:Hide()
 
     frame.mshHealAbsorbBar = CreateFrame("StatusBar", nil, frame)
+    frame.mshHealAbsorbBar:SetFrameStrata(frame:GetFrameStrata())
     frame.mshHealAbsorbBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 2)
     frame.mshHealAbsorbBar:SetAllPoints(frame.healthBar)
     frame.mshHealAbsorbBar:Hide()
@@ -94,7 +107,9 @@ function msh.CreateHealthLayers(frame)
     if not msh.db or not msh.db.profile then return end
     if frame.mshHealthCreated then return end
 
-    frame.mshHP = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    EnsureTextLayer(frame)
+
+    frame.mshHP = frame.mshTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     frame.mshHP:SetDrawLayer("OVERLAY", 7)
 
     if not frame.mshHoverTex then

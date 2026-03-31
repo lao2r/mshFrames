@@ -2,10 +2,23 @@ local _, ns = ...
 local msh = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 
+local function EnsureTextLayer(frame)
+    if not frame or frame.mshTextLayer then
+        return
+    end
+
+    frame.mshTextLayer = CreateFrame("Frame", nil, frame)
+    frame.mshTextLayer:SetFrameStrata(frame:GetFrameStrata())
+    frame.mshTextLayer:SetFrameLevel((frame.healthBar and frame.healthBar:GetFrameLevel() or frame:GetFrameLevel()) + 10)
+    frame.mshTextLayer:SetAllPoints(frame)
+end
+
 function msh.CreateUnitLayers(frame)
     if frame.mshLayersCreated then return end
 
-    frame.mshName = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall", 8)
+    EnsureTextLayer(frame)
+
+    frame.mshName = frame.mshTextLayer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall", 8)
     if frame.name then frame.name:SetAlpha(0) end
 
     frame.mshRole = frame:CreateTexture(nil, "OVERLAY", nil, 5)

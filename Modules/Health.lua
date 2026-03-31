@@ -15,63 +15,79 @@ local function GetPredictionColor(cfg, field, fallback)
     return color.r or fallback.r, color.g or fallback.g, color.b or fallback.b, color.a or fallback.a
 end
 
-local function StylePredictionTexture(texture, texturePath, r, g, b, a, subLevel)
+local function StylePredictionTexture(texture, texturePath, r, g, b, a)
     if not texture then return end
 
     texture:SetTexture(texturePath)
+    texture:SetTexCoord(0, 1, 0, 1)
     texture:SetVertexColor(r, g, b, a)
+end
 
-    if texture.SetDrawLayer then
-        texture:SetDrawLayer("ARTWORK", subLevel or 1)
+local function HideTexture(texture)
+    if texture then
+        texture:Hide()
     end
 end
 
-local function SetPredictionDrawLayer(texture, layer, subLevel)
-    if texture and texture.SetDrawLayer then
-        texture:SetDrawLayer(layer, subLevel or 1)
+local function HidePredictionDecorations(frame)
+    HideTexture(frame.totalAbsorbOverlay)
+    HideTexture(frame.overAbsorbGlow)
+    HideTexture(frame.overHealAbsorbGlow)
+    HideTexture(frame.myHealAbsorbOverlay)
+    HideTexture(frame.myHealAbsorbLeftShadow)
+    HideTexture(frame.myHealAbsorbRightShadow)
+end
+
+local function EnsurePredictionOverlays(frame)
+    if not frame or not frame.healthBar or frame.mshPredictionCreated then
+        return
+    end
+
+    frame.mshShieldBar = CreateFrame("StatusBar", nil, frame)
+    frame.mshShieldBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 1)
+    frame.mshShieldBar:SetAllPoints(frame.healthBar)
+    frame.mshShieldBar:Hide()
+
+    frame.mshHealAbsorbBar = CreateFrame("StatusBar", nil, frame)
+    frame.mshHealAbsorbBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 2)
+    frame.mshHealAbsorbBar:SetAllPoints(frame.healthBar)
+    frame.mshHealAbsorbBar:Hide()
+
+    frame.mshPredictionCreated = true
+end
+
+local function ConfigurePredictionBar(bar, texturePath, r, g, b, a, side)
+    if not bar then return end
+
+    bar:SetStatusBarTexture(texturePath)
+    bar:SetStatusBarColor(r, g, b, a)
+
+    local texture = bar:GetStatusBarTexture()
+    if texture then
+        texture:SetDrawLayer("ARTWORK", 0)
+        texture:SetHorizTile(true)
+        texture:SetVertTile(true)
+    end
+
+    if bar.SetFillStyle and Enum and Enum.StatusBarFillStyle then
+        bar:SetFillStyle(side == "RIGHT" and Enum.StatusBarFillStyle.Reverse or Enum.StatusBarFillStyle.Standard)
+    elseif bar.SetReverseFill then
+        bar:SetReverseFill(side == "RIGHT")
     end
 end
 
-local function ApplyHealAbsorbSide(frame, side)
-    local bar = frame and frame.myHealAbsorb
-    local healthTexture = frame and frame.healthBar and frame.healthBar:GetStatusBarTexture()
+local function UpdatePredictionBar(frame, bar, value, shouldShow)
+    if not frame or not frame.healthBar or not bar then return end
 
-    if not bar or not bar:IsShown() or not healthTexture then
+    if not shouldShow or value == nil then
+        bar:Hide()
         return
     end
 
-    bar:ClearAllPoints()
-
-    if side == "RIGHT" then
-        bar:SetPoint("TOPLEFT", healthTexture, "TOPLEFT", 0, 0)
-        bar:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMLEFT", 0, 0)
-    else
-        bar:SetPoint("TOPRIGHT", healthTexture, "TOPRIGHT", 0, 0)
-        bar:SetPoint("BOTTOMRIGHT", healthTexture, "BOTTOMRIGHT", 0, 0)
-    end
-end
-
-local function ApplyShieldSide(frame, side)
-    local bar = frame and frame.totalAbsorb
-
-    if not bar or not bar:IsShown() then
-        return
-    end
-
-    local _, relativeTo = bar:GetPoint(1)
-    if not relativeTo then
-        return
-    end
-
-    bar:ClearAllPoints()
-
-    if side == "LEFT" then
-        bar:SetPoint("TOPRIGHT", relativeTo, "TOPLEFT", 0, 0)
-        bar:SetPoint("BOTTOMRIGHT", relativeTo, "BOTTOMLEFT", 0, 0)
-    else
-        bar:SetPoint("TOPLEFT", relativeTo, "TOPRIGHT", 0, 0)
-        bar:SetPoint("BOTTOMLEFT", relativeTo, "BOTTOMRIGHT", 0, 0)
-    end
+    local minHealth, maxHealth = frame.healthBar:GetMinMaxValues()
+    bar:SetMinMaxValues(minHealth, maxHealth)
+    bar:SetValue(value)
+    bar:Show()
 end
 
 function msh.CreateHealthLayers(frame)
@@ -105,12 +121,18 @@ function msh.CreateHealthLayers(frame)
     end
 
     if frame.statusText then frame.statusText:SetAlpha(0) end
+    if frame.name and frame.name.SetDrawLayer then
+        frame.name:SetDrawLayer("OVERLAY", 6)
+    end
+
+    EnsurePredictionOverlays(frame)
 
     frame.mshHealthCreated = true
 end
 
 function msh.UpdateHealthPredictionDisplay(frame)
     if not frame or frame:IsForbidden() then return end
+    EnsurePredictionOverlays(frame)
 
     local cfg = msh.GetConfigForFrame(frame)
     if not cfg then return end
@@ -119,18 +141,28 @@ function msh.UpdateHealthPredictionDisplay(frame)
     local shieldTexture = LSM:Fetch("statusbar", cfg.shieldTexture or cfg.texture or "Solid")
     local healR, healG, healB, healA = GetPredictionColor(cfg, "healAbsorbColor", defaultHealAbsorbColor)
     local shieldR, shieldG, shieldB, shieldA = GetPredictionColor(cfg, "shieldColor", defaultShieldColor)
+    local unit = frame.displayedUnit or frame.unit
+    local showHealAbsorb = (frame.myHealAbsorb and frame.myHealAbsorb:IsShown()) or (frame.overHealAbsorbGlow and frame.overHealAbsorbGlow:IsShown())
+    local showShield = (frame.totalAbsorb and frame.totalAbsorb:IsShown()) or (frame.overAbsorbGlow and frame.overAbsorbGlow:IsShown())
 
-    StylePredictionTexture(frame.myHealAbsorb, healAbsorbTexture, healR, healG, healB, healA, 2)
-    StylePredictionTexture(frame.totalAbsorb, shieldTexture, shieldR, shieldG, shieldB, shieldA, 2)
+    StylePredictionTexture(frame.myHealAbsorb, healAbsorbTexture, healR, healG, healB, healA)
+    StylePredictionTexture(frame.totalAbsorb, shieldTexture, shieldR, shieldG, shieldB, shieldA)
 
-    SetPredictionDrawLayer(frame.totalAbsorbOverlay, "ARTWORK", 3)
-    SetPredictionDrawLayer(frame.overAbsorbGlow, "ARTWORK", 4)
-    SetPredictionDrawLayer(frame.overHealAbsorbGlow, "ARTWORK", 4)
-    SetPredictionDrawLayer(frame.myHealAbsorbLeftShadow, "ARTWORK", 3)
-    SetPredictionDrawLayer(frame.myHealAbsorbRightShadow, "ARTWORK", 3)
+    ConfigurePredictionBar(frame.mshHealAbsorbBar, healAbsorbTexture, healR, healG, healB, healA, cfg.healAbsorbSide or "LEFT")
+    ConfigurePredictionBar(frame.mshShieldBar, shieldTexture, shieldR, shieldG, shieldB, shieldA, cfg.shieldSide or "RIGHT")
 
-    ApplyHealAbsorbSide(frame, cfg.healAbsorbSide or "LEFT")
-    ApplyShieldSide(frame, cfg.shieldSide or "RIGHT")
+    HidePredictionDecorations(frame)
+    HideTexture(frame.myHealAbsorb)
+    HideTexture(frame.totalAbsorb)
+
+    if not unit then
+        frame.mshHealAbsorbBar:Hide()
+        frame.mshShieldBar:Hide()
+        return
+    end
+
+    UpdatePredictionBar(frame, frame.mshHealAbsorbBar, UnitGetTotalHealAbsorbs(unit), showHealAbsorb)
+    UpdatePredictionBar(frame, frame.mshShieldBar, UnitGetTotalAbsorbs(unit), showShield)
 end
 
 function msh.UpdateHealthDisplay(frame)

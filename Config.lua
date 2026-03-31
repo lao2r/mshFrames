@@ -55,6 +55,15 @@ local dispelPreviewTypes = {
     ["Disease"] = L["Болезнь"],
     ["Poison"] = L["Яд"],
 }
+local roleSortModes = {
+    ["DEFAULT"] = L["По умолчанию"],
+    ["TANK_HEALER_DAMAGER"] = L["Танк -> Хил -> ДД"],
+    ["TANK_DAMAGER_HEALER"] = L["Танк -> ДД -> Хил"],
+    ["HEALER_TANK_DAMAGER"] = L["Хил -> Танк -> ДД"],
+    ["HEALER_DAMAGER_TANK"] = L["Хил -> ДД -> Танк"],
+    ["DAMAGER_TANK_HEALER"] = L["ДД -> Танк -> Хил"],
+    ["DAMAGER_HEALER_TANK"] = L["ДД -> Хил -> Танк"],
+}
 
 local function GetColorValue(path, field, fallback)
     local color = path[field]
@@ -1570,6 +1579,26 @@ local function GetUnitGroups(path)
                 },
             }
         },
+        sorting = {
+            name = L["Сортировка"],
+            type = "group",
+            order = 7,
+            args = {
+                roleSortMode = {
+                    type = "select",
+                    name = L["Порядок по роли"],
+                    desc = L["Переставляет видимые фреймы по ролям слева направо или сверху вниз, сохраняя текущую сетку Blizzard."],
+                    order = 1,
+                    width = "full",
+                    values = roleSortModes,
+                    get = function() return path.roleSortMode or "DEFAULT" end,
+                    set = function(_, v)
+                        path.roleSortMode = v
+                        msh:Refresh()
+                    end,
+                },
+            },
+        },
         leader = GetLeaderIconControls(path),
     }
 end
@@ -1675,6 +1704,7 @@ local defaultProfile = {
     showRoleTank = true,
     showRoleHeal = true,
     showRoleDamager = false,
+    roleSortMode = "DEFAULT",
     roleIconSize = 15,
     roleIconAlpha = 1,
     roleIconPoint = "TOPLEFT",
@@ -1928,6 +1958,10 @@ function msh.SyncBlizzardSettings()
 
     if CompactUnitFrameProfiles_ApplyCurrentSettings then
         CompactUnitFrameProfiles_ApplyCurrentSettings()
+    end
+
+    if msh.QueueRoleSort then
+        msh.QueueRoleSort()
     end
 end
 

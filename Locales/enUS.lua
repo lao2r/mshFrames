@@ -82,6 +82,17 @@ L["Центральный Сейв"] = "Big Center Save"
 
 L["Рейдовые метки"] = "Raid Markers"
 L["Иконки ролей"] = "Role Icons"
+L["Сортировка"] = "Sorting"
+L["Порядок по роли"] = "Role Order"
+L["Переставляет видимые фреймы по ролям слева направо или сверху вниз, сохраняя текущую сетку Blizzard."] =
+"Reorders visible frames by role from left to right or top to bottom while preserving the current Blizzard grid."
+L["По умолчанию"] = "Default"
+L["Танк -> Хил -> ДД"] = "Tank -> Healer -> DPS"
+L["Танк -> ДД -> Хил"] = "Tank -> DPS -> Healer"
+L["Хил -> Танк -> ДД"] = "Healer -> Tank -> DPS"
+L["Хил -> ДД -> Танк"] = "Healer -> DPS -> Tank"
+L["ДД -> Танк -> Хил"] = "DPS -> Tank -> Healer"
+L["ДД -> Хил -> Танк"] = "DPS -> Healer -> Tank"
 L["Полностью отключает кастомизацию ролей и возвращает родные иконки игры."] =
 "Completely disables custom role icons and returns the default ones."
 L["Включить кастомные иконки ролей"] = "Enable custom role icons"

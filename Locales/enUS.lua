@@ -113,7 +113,7 @@ L["Скрыть тест полос"] = "Hide Bar Preview"
 L["Показывает тестовые полосы щита и поглощения исцеления для настройки."] =
 "Shows preview shield and heal absorb bars for visual tuning."
 L["Сплошная"] = "Solid"
-L["Pixel Glow"] = "Pixel Glow"
+L["Пунктирная"] = "Dashed"
 L["Рамка диспела"] = "Dispel Border"
 L["Показывает рамку вокруг фрейма при наличии рассеиваемого дебаффа."] =
 "Shows a border around the frame when a dispellable debuff is present."

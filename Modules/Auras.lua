@@ -124,20 +124,39 @@ function msh.GetAuraDispelType(icon)
     return icon.mshDispelType or icon.dispelName or icon.dispelType or icon.debuffType
 end
 
+local function ResolveAuraHookArgs(...)
+    local button
+    local aura
+
+    for i = 1, select("#", ...) do
+        local arg = select(i, ...)
+        if not button and type(arg) == "table" and arg.IsObjectType and arg:IsObjectType("Frame") then
+            button = arg
+        elseif not aura and type(arg) == "table" and (arg.auraInstanceID or arg.spellId or arg.spellID or arg.dispelName or arg.dispelType or arg.debuffType) then
+            aura = arg
+        end
+    end
+
+    return button, aura
+end
+
 if CompactUnitFrame_UtilSetBuff then
-    hooksecurefunc("CompactUnitFrame_UtilSetBuff", function(buffFrame, aura)
+    hooksecurefunc("CompactUnitFrame_UtilSetBuff", function(...)
+        local buffFrame, aura = ResolveAuraHookArgs(...)
         TrackAuraSpellID(buffFrame, aura)
     end)
 end
 
 if CompactUnitFrame_UtilSetDebuff then
-    hooksecurefunc("CompactUnitFrame_UtilSetDebuff", function(_, debuffFrame, aura)
+    hooksecurefunc("CompactUnitFrame_UtilSetDebuff", function(...)
+        local debuffFrame, aura = ResolveAuraHookArgs(...)
         TrackAuraSpellID(debuffFrame, aura)
     end)
 end
 
 if CompactUnitFrame_UtilSetDispelDebuff then
-    hooksecurefunc("CompactUnitFrame_UtilSetDispelDebuff", function(_, dispellDebuffFrame, aura)
+    hooksecurefunc("CompactUnitFrame_UtilSetDispelDebuff", function(...)
+        local dispellDebuffFrame, aura = ResolveAuraHookArgs(...)
         TrackAuraSpellID(dispellDebuffFrame, aura)
     end)
 end

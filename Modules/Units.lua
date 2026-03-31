@@ -10,12 +10,7 @@ local defaultDispelColors = {
     Poison = { r = 0.00, g = 0.85, b = 0.20, a = 0.95 },
 }
 local dispelOverlaySides = { "TOP", "BOTTOM", "LEFT", "RIGHT" }
-local pixelGlowLayers = {
-    { alpha = 0.85 },
-    { alpha = 0.35 },
-    { alpha = 0.15 },
-}
-local pixelGlowKey = "mshDispel"
+local dashedSegmentsPerSide = 16
 
 local function EnsureTextLayer(frame)
     if not frame or frame.mshTextLayer then
@@ -57,14 +52,6 @@ local function CreateOverlayTexture(parent, subLevel)
     return texture
 end
 
-local function GetCustomGlowLib()
-    if not LibStub then
-        return nil
-    end
-
-    return LibStub("LibCustomGlow-1.0", true)
-end
-
 local function EnsureDispelOverlay(frame)
     if not frame or not frame.healthBar or frame.mshDispelOverlayFrame then
         return
@@ -85,14 +72,14 @@ local function EnsureDispelOverlay(frame)
     end
 
     overlay.pixelEdges = {}
-    for layerIndex = 1, #pixelGlowLayers do
+    for _, side in ipairs(dispelOverlaySides) do
         local edges = {}
-        for _, side in ipairs(dispelOverlaySides) do
-            edges[side] = CreateOverlayTexture(overlay, 1 + layerIndex)
+        for index = 1, dashedSegmentsPerSide do
+            edges[index] = CreateOverlayTexture(overlay, 2)
+            edges[index]:SetBlendMode("BLEND")
         end
-        overlay.pixelEdges[layerIndex] = edges
+        overlay.pixelEdges[side] = edges
     end
-
     frame.mshDispelOverlayFrame = overlay
 end
 
@@ -116,19 +103,62 @@ local function SetEdgeSetBlendMode(edges, mode)
     end
 end
 
+local function HideAllPixelEdges(overlay)
+    if not overlay or not overlay.pixelEdges then
+        return
+    end
+
+    for _, edges in pairs(overlay.pixelEdges) do
+        HideEdgeSet(edges)
+    end
+end
+
+local function LayoutDashedSide(textures, overlay, side, thickness, dashLength, dashGap)
+    if not textures or not overlay then
+        return
+    end
+
+    local span = (side == "TOP" or side == "BOTTOM") and overlay:GetWidth() or overlay:GetHeight()
+    local count = math.max(1, math.min(#textures, math.floor((span + dashGap) / (dashLength + dashGap))))
+    local startOffset = 0
+
+    if count > 0 then
+        local used = count * dashLength + (count - 1) * dashGap
+        startOffset = math.max(0, math.floor((span - used) / 2))
+    end
+
+    for index, texture in ipairs(textures) do
+        texture:ClearAllPoints()
+
+        if index <= count then
+            local offset = startOffset + (index - 1) * (dashLength + dashGap)
+
+            if side == "TOP" then
+                texture:SetPoint("TOPLEFT", overlay, "TOPLEFT", offset, 0)
+                texture:SetSize(dashLength, thickness)
+            elseif side == "BOTTOM" then
+                texture:SetPoint("BOTTOMLEFT", overlay, "BOTTOMLEFT", offset, 0)
+                texture:SetSize(dashLength, thickness)
+            elseif side == "LEFT" then
+                texture:SetPoint("TOPLEFT", overlay, "TOPLEFT", 0, -offset)
+                texture:SetSize(thickness, dashLength)
+            else
+                texture:SetPoint("TOPRIGHT", overlay, "TOPRIGHT", 0, -offset)
+                texture:SetSize(thickness, dashLength)
+            end
+
+            texture:Show()
+        else
+            texture:Hide()
+        end
+    end
+end
+
 local function HideDispelOverlay(frame)
     if frame and frame.mshDispelOverlayFrame then
-        local customGlow = GetCustomGlowLib()
-        if customGlow and customGlow.PixelGlow_Stop then
-            customGlow.PixelGlow_Stop(frame.mshDispelOverlayFrame, pixelGlowKey)
-        end
-
         frame.mshDispelOverlayFrame:Hide()
         HideEdgeSet(frame.mshDispelOverlayFrame.solidEdges)
-
-        for _, edges in ipairs(frame.mshDispelOverlayFrame.pixelEdges or {}) do
-            HideEdgeSet(edges)
-        end
+        HideAllPixelEdges(frame.mshDispelOverlayFrame)
     end
 
     if frame and frame.DispelOverlay and frame.DispelOverlay.SetAlpha then
@@ -273,15 +303,8 @@ local function ApplySolidDispelOverlay(frame, r, g, b, a, thickness)
     end
 
     overlay:Show()
-    local customGlow = GetCustomGlowLib()
-    if customGlow and customGlow.PixelGlow_Stop then
-        customGlow.PixelGlow_Stop(overlay, pixelGlowKey)
-    end
 
-    for _, edges in ipairs(overlay.pixelEdges or {}) do
-        SetEdgeSetBlendMode(edges, "BLEND")
-        HideEdgeSet(edges)
-    end
+    HideAllPixelEdges(overlay)
 
     for side, texture in pairs(overlay.solidEdges or {}) do
         LayoutOverlayEdge(texture, overlay, side, 0, thickness)
@@ -289,6 +312,20 @@ local function ApplySolidDispelOverlay(frame, r, g, b, a, thickness)
         texture:SetVertexColor(r, g, b, a)
         texture:Show()
     end
+end
+
+local function GetFrameDispelType(frame)
+    if not frame or not frame.dispels then
+        return nil
+    end
+
+    for _, dispelType in ipairs(knownDispelTypes) do
+        if frame.dispels[dispelType] then
+            return dispelType
+        end
+    end
+
+    return nil
 end
 
 local function ApplyPixelDispelOverlay(frame, r, g, b, a, thickness)
@@ -300,40 +337,16 @@ local function ApplyPixelDispelOverlay(frame, r, g, b, a, thickness)
     overlay:Show()
     HideEdgeSet(overlay.solidEdges)
 
-    local customGlow = GetCustomGlowLib()
-    if customGlow and customGlow.PixelGlow_Start then
-        for _, edges in ipairs(overlay.pixelEdges or {}) do
-            HideEdgeSet(edges)
+    local dashThickness = math.max(1, thickness)
+    local dashLength = math.max(4, dashThickness * 3)
+    local dashGap = math.max(2, dashThickness * 2)
+
+    for side, textures in pairs(overlay.pixelEdges or {}) do
+        for _, texture in ipairs(textures) do
+            texture:SetBlendMode("BLEND")
+            texture:SetVertexColor(r, g, b, a)
         end
-
-        customGlow.PixelGlow_Start(
-            overlay,
-            { r, g, b, a },
-            8,
-            0.25,
-            nil,
-            math.max(1, thickness),
-            0,
-            0,
-            false,
-            pixelGlowKey,
-            1
-        )
-        return
-    end
-
-    for index, layerData in ipairs(pixelGlowLayers) do
-        local glowOffset = (index - 1) * math.max(1, thickness)
-        local edges = overlay.pixelEdges and overlay.pixelEdges[index]
-
-        if edges then
-            for side, texture in pairs(edges) do
-                LayoutOverlayEdge(texture, overlay, side, glowOffset, 1)
-                texture:SetBlendMode("ADD")
-                texture:SetVertexColor(r, g, b, a * layerData.alpha)
-                texture:Show()
-            end
-        end
+        LayoutDashedSide(textures, overlay, side, dashThickness, dashLength, dashGap)
     end
 end
 
@@ -403,7 +416,8 @@ local function UpdateDispelOverlay(frame, cfg, activeDispelIcon, globalMode, had
         dispelType = NormalizeDispelType(cfg.dispelOverlayPreviewType or "Magic") or "Magic"
         r, g, b, a = GetDispelOverlayColor(cfg, dispelType)
     else
-        dispelType = GetDispelTypeForIcon(activeDispelIcon) or GuessDispelTypeFromColor(nativeR, nativeG, nativeB)
+        dispelType = GetFrameDispelType(frame) or GetDispelTypeForIcon(activeDispelIcon) or
+            GuessDispelTypeFromColor(nativeR, nativeG, nativeB)
         if dispelType then
             r, g, b, a = GetDispelOverlayColor(cfg, dispelType)
         else

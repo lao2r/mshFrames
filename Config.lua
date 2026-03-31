@@ -47,7 +47,7 @@ local absorbSides = {
 }
 local dispelOverlayStyles = {
     ["SOLID"] = L["Сплошная"],
-    ["PIXEL"] = L["Pixel Glow"],
+    ["PIXEL"] = L["Пунктирная"],
 }
 local dispelPreviewTypes = {
     ["Magic"] = L["Магия"],

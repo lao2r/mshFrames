@@ -441,10 +441,12 @@ local function UpdateDispelOverlay(frame, cfg, activeDispelIcon, globalMode, had
     local nativeShown, nativeR, nativeG, nativeB, nativeA = GetNativeDispelVisual(frame, activeDispelIcon)
     HideDispelOverlay(frame)
 
-    if not previewEnabled then
-        if cfg.dispelIndicatorOverlay == false or globalMode == "0" or not nativeShown or (not activeDispelIcon and hadShownDispel) then
-            return
-        end
+    if cfg.dispelIndicatorOverlay == false then
+        return
+    end
+
+    if not previewEnabled and (globalMode == "0" or not nativeShown or (not activeDispelIcon and hadShownDispel)) then
+        return
     end
 
     local dispelType

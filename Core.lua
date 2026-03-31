@@ -1,6 +1,62 @@
 local addonName, ns = ...
 
 local msh = LibStub("AceAddon-3.0"):NewAddon(ns, addonName, "AceEvent-3.0")
+local spellIDListCache = setmetatable({}, { __mode = "k" })
+
+local function ParseSpellIDList(rawValue)
+    local normalizedList = {}
+    local spellIDSet = {}
+
+    if type(rawValue) ~= "string" then
+        return nil, ""
+    end
+
+    for token in rawValue:gmatch("[^,%s;]+") do
+        local spellID = tonumber(token)
+        if spellID then
+            spellID = math.floor(spellID)
+            if spellID > 0 and not spellIDSet[spellID] then
+                spellIDSet[spellID] = true
+                table.insert(normalizedList, spellID)
+            end
+        end
+    end
+
+    if #normalizedList == 0 then
+        return nil, ""
+    end
+
+    return spellIDSet, table.concat(normalizedList, ", ")
+end
+
+function msh.NormalizeSpellIDList(rawValue)
+    local _, normalized = ParseSpellIDList(rawValue)
+    return normalized
+end
+
+function msh.GetExcludedSpellIDSet(cfg, field)
+    if not cfg or not field then
+        return nil
+    end
+
+    local rawValue = cfg[field] or ""
+    local cacheEntry = spellIDListCache[cfg]
+
+    if not cacheEntry then
+        cacheEntry = {}
+        spellIDListCache[cfg] = cacheEntry
+    end
+
+    if not cacheEntry[field] or cacheEntry[field].rawValue ~= rawValue then
+        local spellIDSet = select(1, ParseSpellIDList(rawValue))
+        cacheEntry[field] = {
+            rawValue = rawValue,
+            spellIDSet = spellIDSet,
+        }
+    end
+
+    return cacheEntry[field].spellIDSet
+end
 
 function msh.GetConfigForFrame(frame)
     if not msh.db or not msh.db.profile then

@@ -42,6 +42,22 @@ local outlineOrder = {
     "MONOCHROME"
 }
 
+local function GetSpellIDFilterInput(path, field)
+    return {
+        type = "input",
+        name = L["Исключить Spell ID"],
+        desc = L["Скрывает ауры с указанными spell id. Можно перечислять через запятую, пробел или с новой строки."],
+        order = 1,
+        width = "full",
+        multiline = 4,
+        get = function() return path[field] or "" end,
+        set = function(_, value)
+            path[field] = msh.NormalizeSpellIDList(value)
+            msh:Refresh()
+        end,
+    }
+end
+
 local function AddAuraControls(args, path, key, label, customColor)
     local toggleKey = "show" .. key
     local blizzKey = "useBlizz" .. key
@@ -410,6 +426,15 @@ local function GetUnitGroups(path)
                 },
             }
         },
+        filters = {
+            type = "group",
+            name = L["Фильтр по Spell ID"],
+            order = 30,
+            inline = true,
+            args = {
+                excludedBuffSpellIDs = GetSpellIDFilterInput(path, "excludedBuffSpellIDs"),
+            },
+        },
     }
     AddAuraControls(buffsArgs, path, L["Баффы"], "|cff00ffff")
 
@@ -583,6 +608,15 @@ local function GetUnitGroups(path)
                     end
                 },
             }
+        },
+        filters = {
+            type = "group",
+            name = L["Фильтр по Spell ID"],
+            order = 30,
+            inline = true,
+            args = {
+                excludedDebuffSpellIDs = GetSpellIDFilterInput(path, "excludedDebuffSpellIDs"),
+            },
         }
     }
     AddAuraControls(debuffsArgs, path, L["Дебаффы"], "|cffff00ff")
@@ -1261,6 +1295,7 @@ local defaultProfile = {
     useBlizzBuffs = true,
     showCustomBuffs = false,
     showBuffsTooltip = false,
+    excludedBuffSpellIDs = "",
     buffSize = 20,
     buffTextScale = 0.6,
     buffPoint = "BOTTOMLEFT",
@@ -1275,6 +1310,7 @@ local defaultProfile = {
     useBlizzDebuffs = true,
     showCustomDebuffs = false,
     showDebuffsTooltip = false,
+    excludedDebuffSpellIDs = "",
     debuffSize = 20,
     debuffPoint = "BOTTOMRIGHT",
     debuffX = 2,

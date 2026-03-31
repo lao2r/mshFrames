@@ -16,6 +16,38 @@ local function UpdateCooldownFont(button, fontPath, size)
     end
 end
 
+local function TrackAuraSpellID(button, aura)
+    if not button then return end
+    if type(aura) == "table" then
+        button.mshSpellID = aura.spellId or aura.spellID
+    else
+        button.mshSpellID = nil
+    end
+end
+
+local function GetAuraSpellID(icon)
+    if not icon then return nil end
+    return icon.mshSpellID or icon.spellID or icon.spellId
+end
+
+if CompactUnitFrame_UtilSetBuff then
+    hooksecurefunc("CompactUnitFrame_UtilSetBuff", function(buffFrame, aura)
+        TrackAuraSpellID(buffFrame, aura)
+    end)
+end
+
+if CompactUnitFrame_UtilSetDebuff then
+    hooksecurefunc("CompactUnitFrame_UtilSetDebuff", function(_, debuffFrame, aura)
+        TrackAuraSpellID(debuffFrame, aura)
+    end)
+end
+
+if CompactUnitFrame_UtilSetDispelDebuff then
+    hooksecurefunc("CompactUnitFrame_UtilSetDispelDebuff", function(_, dispellDebuffFrame, aura)
+        TrackAuraSpellID(dispellDebuffFrame, aura)
+    end)
+end
+
 function msh.UpdateAuras(frame)
     if not frame or frame:IsForbidden() or isSetting then return end
 
@@ -30,6 +62,7 @@ function msh.UpdateAuras(frame)
     local localFont = cfg.fontName
     local activeFont = (localFont and localFont ~= "Default" and localFont ~= "") and localFont or globalFont
     local fontPath = LSM:Fetch("font", activeFont or "Friz Quadrata TT")
+    local centerStatusIcon = frame.CenterDefensiveBuff or frame.centerStatusIcon
 
 
     local auraSettings = {
@@ -48,6 +81,7 @@ function msh.UpdateAuras(frame)
             textScale = cfg.buffTextScale,
             showtooltip = cfg.showBuffsTooltip,
             alpha = cfg.buffAlpha or 1,
+            excludedSpellIDs = msh.GetExcludedSpellIDSet(cfg, "excludedBuffSpellIDs"),
         },
         {
             pool = frame.debuffFrames,
@@ -64,9 +98,10 @@ function msh.UpdateAuras(frame)
             textScale = cfg.debuffTextScale,
             showtooltip = cfg.showDebuffsTooltip,
             alpha = cfg.debuffAlpha or 1,
+            excludedSpellIDs = msh.GetExcludedSpellIDSet(cfg, "excludedDebuffSpellIDs"),
         },
         {
-            pool = { frame.CenterDefensiveBuff or frame.centerStatusIcon },
+            pool = { centerStatusIcon },
             enabled = globalShowBigSave,
             isBlizz = cfg.useBlizzBigSave,
             isCustom = cfg.showCustomBigSave,
@@ -80,6 +115,7 @@ function msh.UpdateAuras(frame)
             textScale = cfg.bigSaveTextScale,
             showtooltip = cfg.showBigSaveTooltip,
             alpha = cfg.bigSaveAlpha or 1,
+            excludedSpellIDs = msh.GetExcludedSpellIDSet(cfg, "excludedBuffSpellIDs"),
         }
     }
 
@@ -96,43 +132,49 @@ function msh.UpdateAuras(frame)
                 for i = 1, #pool do
                     local icon = pool[i]
                     if icon and icon:IsShown() then
-                        icon:EnableMouse(data.showtooltip)
-                        icon:SetAlpha(data.alpha)
+                        local spellID = GetAuraSpellID(icon)
 
-                        if data.isCustom or (data.pool[1] == (frame.CenterDefensiveBuff or frame.centerStatusIcon)) then
-                            local currentSize = data.size or 20
-                            icon:SetSize(currentSize, currentSize)
+                        if data.excludedSpellIDs and spellID and data.excludedSpellIDs[spellID] then
+                            icon:Hide()
                         else
-                            if not (data.isBlizz and data.pool == frame.debuffFrames) then
-                                icon:SetSize(data.size or 18, data.size or 18)
-                            end
-                        end
+                            icon:EnableMouse(data.showtooltip)
+                            icon:SetAlpha(data.alpha)
 
-
-                        if not isBlizz then
-                            icon:ClearAllPoints()
-                            if not previousIcon then
-                                icon:SetPoint(data.point, frame, data.point, data.x, data.y)
+                            if data.isCustom or (data.pool[1] == centerStatusIcon) then
+                                local currentSize = data.size or 20
+                                icon:SetSize(currentSize, currentSize)
                             else
-                                local anchor, rel, offX, offY = "LEFT", "RIGHT", (data.space or 2), 0
-                                if data.grow == "LEFT" then
-                                    anchor, rel, offX = "RIGHT", "LEFT", -(data.space or 2)
-                                elseif data.grow == "UP" then
-                                    anchor, rel, offX, offY = "BOTTOM", "TOP", 0, (data.space or 2)
-                                elseif data.grow == "DOWN" then
-                                    anchor, rel, offX, offY = "TOP", "BOTTOM", 0, -(data.space or 2)
+                                if not (data.isBlizz and data.pool == frame.debuffFrames) then
+                                    icon:SetSize(data.size or 18, data.size or 18)
                                 end
-                                icon:SetPoint(anchor, previousIcon, rel, offX, offY)
                             end
-                            previousIcon = icon
-                        end
 
 
-                        if icon.cooldown then
-                            icon.cooldown:SetHideCountdownNumbers(not data.timer)
-                            local currentWidth = icon:GetWidth()
-                            local fontSize = currentWidth * (data.textScale or 0.7)
-                            UpdateCooldownFont(icon, fontPath, fontSize)
+                            if not isBlizz then
+                                icon:ClearAllPoints()
+                                if not previousIcon then
+                                    icon:SetPoint(data.point, frame, data.point, data.x, data.y)
+                                else
+                                    local anchor, rel, offX, offY = "LEFT", "RIGHT", (data.space or 2), 0
+                                    if data.grow == "LEFT" then
+                                        anchor, rel, offX = "RIGHT", "LEFT", -(data.space or 2)
+                                    elseif data.grow == "UP" then
+                                        anchor, rel, offX, offY = "BOTTOM", "TOP", 0, (data.space or 2)
+                                    elseif data.grow == "DOWN" then
+                                        anchor, rel, offX, offY = "TOP", "BOTTOM", 0, -(data.space or 2)
+                                    end
+                                    icon:SetPoint(anchor, previousIcon, rel, offX, offY)
+                                end
+                                previousIcon = icon
+                            end
+
+
+                            if icon.cooldown then
+                                icon.cooldown:SetHideCountdownNumbers(not data.timer)
+                                local currentWidth = icon:GetWidth()
+                                local fontSize = currentWidth * (data.textScale or 0.7)
+                                UpdateCooldownFont(icon, fontPath, fontSize)
+                            end
                         end
                     end
                 end

@@ -25,6 +25,10 @@ L["Включить"] = "Enable"
 L["Выключено"] = "Disabled"
 L["Показать Тултип"] = "Show Tooltip"
 L["Показывать описание при наведении на иконку"] = "Show description on hover"
+L["Фильтр по Spell ID"] = "Spell ID Filter"
+L["Исключить Spell ID"] = "Exclude Spell IDs"
+L["Скрывает ауры с указанными spell id. Можно перечислять через запятую, пробел или с новой строки."] =
+"Hide auras with the specified spell IDs. Separate values with commas, spaces, or new lines."
 
 L["Стандартные Blizzard"] = "Blizzard Default"
 L["Кастомные ауры"] = "Custom Auras"

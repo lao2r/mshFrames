@@ -58,21 +58,39 @@ local function EnsureTextLayer(frame)
     frame.mshTextLayer:SetAllPoints(frame)
 end
 
+local function ReparentPredictionElement(element, parent)
+    if element and parent and element.SetParent then
+        element:SetParent(parent)
+    end
+end
+
 local function EnsurePredictionOverlays(frame)
     if not frame or not frame.healthBar or frame.mshPredictionCreated then
         return
     end
 
-    frame.mshShieldBar = CreateFrame("StatusBar", nil, frame)
+    frame.mshPredictionClip = CreateFrame("Frame", nil, frame)
+    frame.mshPredictionClip:SetFrameStrata(frame:GetFrameStrata())
+    frame.mshPredictionClip:SetFrameLevel(frame.healthBar:GetFrameLevel() + 1)
+    frame.mshPredictionClip:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT")
+    frame.mshPredictionClip:SetPoint("BOTTOMRIGHT", frame.healthBar, "BOTTOMRIGHT")
+    if frame.mshPredictionClip.SetClipsChildren then
+        frame.mshPredictionClip:SetClipsChildren(true)
+    end
+
+    ReparentPredictionElement(frame.myHealPrediction, frame.mshPredictionClip)
+    ReparentPredictionElement(frame.otherHealPrediction, frame.mshPredictionClip)
+
+    frame.mshShieldBar = CreateFrame("StatusBar", nil, frame.mshPredictionClip)
     frame.mshShieldBar:SetFrameStrata(frame:GetFrameStrata())
     frame.mshShieldBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 1)
-    frame.mshShieldBar:SetAllPoints(frame.healthBar)
+    frame.mshShieldBar:SetAllPoints(frame.mshPredictionClip)
     frame.mshShieldBar:Hide()
 
-    frame.mshHealAbsorbBar = CreateFrame("StatusBar", nil, frame)
+    frame.mshHealAbsorbBar = CreateFrame("StatusBar", nil, frame.mshPredictionClip)
     frame.mshHealAbsorbBar:SetFrameStrata(frame:GetFrameStrata())
     frame.mshHealAbsorbBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 2)
-    frame.mshHealAbsorbBar:SetAllPoints(frame.healthBar)
+    frame.mshHealAbsorbBar:SetAllPoints(frame.mshPredictionClip)
     frame.mshHealAbsorbBar:Hide()
 
     frame.mshPredictionCreated = true
@@ -128,7 +146,7 @@ local function UpdatePreviewPredictionBar(frame, bar, side, value)
     if not frame or not frame.healthBar or not bar then return end
 
     bar:ClearAllPoints()
-    bar:SetAllPoints(frame.healthBar)
+    bar:SetAllPoints(frame.mshPredictionClip or frame.healthBar)
 
     if bar.SetFillStyle and Enum and Enum.StatusBarFillStyle then
         bar:SetFillStyle(side == "RIGHT" and Enum.StatusBarFillStyle.Reverse or Enum.StatusBarFillStyle.Standard)

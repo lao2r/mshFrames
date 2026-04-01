@@ -397,7 +397,36 @@ local function SetAggroEdge(texture, point, relativeTo, relativePoint, x, y, wid
     texture:Show()
 end
 
-local function UpdateAggroBorder(holder, shape, width, height, thickness, r, g, b, a)
+local function SetAggroStretch(texture, side, holder, thickness, r, g, b, a)
+    if not texture then
+        return
+    end
+
+    texture:ClearAllPoints()
+
+    if side == "TOP" then
+        texture:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
+        texture:SetPoint("TOPRIGHT", holder, "TOPRIGHT", 0, 0)
+        texture:SetHeight(thickness)
+    elseif side == "BOTTOM" then
+        texture:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
+        texture:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0)
+        texture:SetHeight(thickness)
+    elseif side == "LEFT" then
+        texture:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
+        texture:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
+        texture:SetWidth(thickness)
+    else
+        texture:SetPoint("TOPRIGHT", holder, "TOPRIGHT", 0, 0)
+        texture:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0)
+        texture:SetWidth(thickness)
+    end
+
+    texture:SetVertexColor(r, g, b, a)
+    texture:Show()
+end
+
+local function UpdateAggroBorder(holder, shape, thickness, r, g, b, a)
     local edges = holder and holder.edges
     if not edges then
         return
@@ -407,7 +436,7 @@ local function UpdateAggroBorder(holder, shape, width, height, thickness, r, g, 
         texture:Hide()
     end
 
-    local segment = math.max(thickness * 2, math.floor(math.min(width, height) * 0.3))
+    local segment = math.max(thickness * 3, 10)
 
     if shape == "CORNERS" then
         SetAggroEdge(edges[1], "TOPLEFT", holder, "TOPLEFT", 0, 0, segment, thickness, r, g, b, a)
@@ -419,17 +448,17 @@ local function UpdateAggroBorder(holder, shape, width, height, thickness, r, g, 
         SetAggroEdge(edges[7], "BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0, segment, thickness, r, g, b, a)
         SetAggroEdge(edges[8], "BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0, thickness, segment, r, g, b, a)
     elseif shape == "BRACKETS" then
-        SetAggroEdge(edges[1], "TOPLEFT", holder, "TOPLEFT", 0, 0, thickness, height, r, g, b, a)
+        SetAggroStretch(edges[1], "LEFT", holder, thickness, r, g, b, a)
         SetAggroEdge(edges[2], "TOPLEFT", holder, "TOPLEFT", 0, 0, segment, thickness, r, g, b, a)
         SetAggroEdge(edges[3], "BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0, segment, thickness, r, g, b, a)
-        SetAggroEdge(edges[4], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, thickness, height, r, g, b, a)
+        SetAggroStretch(edges[4], "RIGHT", holder, thickness, r, g, b, a)
         SetAggroEdge(edges[5], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, segment, thickness, r, g, b, a)
         SetAggroEdge(edges[6], "BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0, segment, thickness, r, g, b, a)
     else
-        SetAggroEdge(edges[1], "TOPLEFT", holder, "TOPLEFT", 0, 0, width, thickness, r, g, b, a)
-        SetAggroEdge(edges[2], "BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0, width, thickness, r, g, b, a)
-        SetAggroEdge(edges[3], "TOPLEFT", holder, "TOPLEFT", 0, 0, thickness, height, r, g, b, a)
-        SetAggroEdge(edges[4], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, thickness, height, r, g, b, a)
+        SetAggroStretch(edges[1], "TOP", holder, thickness, r, g, b, a)
+        SetAggroStretch(edges[2], "BOTTOM", holder, thickness, r, g, b, a)
+        SetAggroStretch(edges[3], "LEFT", holder, thickness, r, g, b, a)
+        SetAggroStretch(edges[4], "RIGHT", holder, thickness, r, g, b, a)
     end
 end
 
@@ -462,21 +491,17 @@ local function UpdateAggroIndicator(frame, cfg)
     local mode = cfg.aggroIndicatorMode or "BORDER"
     local shape = cfg.aggroBorderShape or "FRAME"
     local r, g, b, a = GetConfiguredColor(cfg, "aggroColor", defaultAggroColor)
-    local baseWidth = (frame.healthBar.GetWidth and frame.healthBar:GetWidth()) or 0
-    local baseHeight = (frame.healthBar.GetHeight and frame.healthBar:GetHeight()) or 0
     local offsetX = 0
     local offsetY = 0
     local width
     local height
 
     if mode == "BORDER" then
-        width = math.max(4, baseWidth + (cfg.aggroWidth or 0))
-        height = math.max(4, baseHeight + (cfg.aggroHeight or 0))
         offsetX = cfg.aggroX or 0
         offsetY = cfg.aggroY or 0
     elseif mode == "TEXT" then
         local fontSize = math.max(8, math.floor(cfg.aggroTextSize or 14))
-        width = math.max(12, baseWidth)
+        width = 1
         height = math.max(12, fontSize + 6)
         offsetX = cfg.aggroTextX or 0
         offsetY = cfg.aggroTextY or 0
@@ -488,8 +513,15 @@ local function UpdateAggroIndicator(frame, cfg)
     end
 
     holder:ClearAllPoints()
-    holder:SetSize(width, height)
-    holder:SetPoint("CENTER", frame.healthBar, "CENTER", offsetX, offsetY)
+    if mode == "BORDER" then
+        local widthOffset = cfg.aggroWidth or 0
+        local heightOffset = cfg.aggroHeight or 0
+        holder:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT", offsetX - (widthOffset / 2), offsetY + (heightOffset / 2))
+        holder:SetPoint("BOTTOMRIGHT", frame.healthBar, "BOTTOMRIGHT", offsetX + (widthOffset / 2), offsetY - (heightOffset / 2))
+    else
+        holder:SetSize(width, height)
+        holder:SetPoint("CENTER", frame.healthBar, "CENTER", offsetX, offsetY)
+    end
     holder:Show()
 
     for _, texture in ipairs(holder.edges or {}) do
@@ -527,7 +559,7 @@ local function UpdateAggroIndicator(frame, cfg)
         holder.arrow:Show()
     else
         local thickness = math.max(1, math.floor(cfg.aggroBorderThickness or 2))
-        UpdateAggroBorder(holder, shape, width, height, thickness, r, g, b, a)
+        UpdateAggroBorder(holder, shape, thickness, r, g, b, a)
     end
 
     SetNativeAggroHighlightAlpha(frame, 0)

@@ -55,6 +55,22 @@ local dispelPreviewTypes = {
     ["Disease"] = L["Болезнь"],
     ["Poison"] = L["Яд"],
 }
+local aggroIndicatorModes = {
+    ["BORDER"] = L["Рамка"],
+    ["TEXT"] = L["Текст"],
+    ["ARROW"] = L["Стрелка"],
+}
+local aggroArrowDirections = {
+    ["UP"] = L["Вверх"],
+    ["DOWN"] = L["Вниз"],
+    ["LEFT"] = L["Влево"],
+    ["RIGHT"] = L["Вправо"],
+}
+local aggroBorderShapes = {
+    ["FRAME"] = L["Полная"],
+    ["CORNERS"] = L["Углы"],
+    ["BRACKETS"] = L["Скобки"],
+}
 local roleSortModes = {
     ["DEFAULT"] = L["По умолчанию"],
     ["TANK_HEALER_DAMAGER"] = L["Танк -> Хил -> ДД"],
@@ -224,7 +240,7 @@ local function GetLeaderIconControls(path)
     return {
         name = L["Иконка лидера"],
         type = "group",
-        order = 7,
+        order = 9,
         args = {
             showLeaderIcon = {
                 name = L["Включить иконку"],
@@ -1452,10 +1468,295 @@ local function GetUnitGroups(path)
                 },
             }
         },
+        aggro = {
+            name = L["Аггро"],
+            type = "group",
+            order = 6,
+            args = {
+                showAggroIndicator = {
+                    type = "toggle",
+                    name = L["Включить индикатор"],
+                    desc = L["Показывает кастомный индикатор аггро и скрывает стандартный Blizzard, пока он активен."],
+                    order = 1,
+                    width = "full",
+                    get = function() return path.showAggroIndicator ~= false end,
+                    set = function(_, v)
+                        path.showAggroIndicator = v
+                        msh:Refresh()
+                    end,
+                },
+                aggroIndicatorMode = {
+                    type = "select",
+                    name = L["Режим"],
+                    order = 2,
+                    values = aggroIndicatorModes,
+                    disabled = function() return path.showAggroIndicator == false end,
+                    get = function() return path.aggroIndicatorMode or "BORDER" end,
+                    set = function(_, v)
+                        path.aggroIndicatorMode = v
+                        msh:Refresh()
+                    end,
+                },
+                aggroColor = {
+                    type = "color",
+                    name = L["Цвет"],
+                    order = 3,
+                    hasAlpha = true,
+                    disabled = function() return path.showAggroIndicator == false end,
+                    get = function()
+                        return GetColorValue(path, "aggroColor", { r = 1, g = 0.15, b = 0.15, a = 0.95 })
+                    end,
+                    set = function(_, r, g, b, a)
+                        SetColorValue(path, "aggroColor", r, g, b, a)
+                        msh:Refresh()
+                    end,
+                },
+                aggroBorder = {
+                    type = "group",
+                    name = L["Рамка"],
+                    order = 4,
+                    inline = true,
+                    hidden = function()
+                        return path.showAggroIndicator == false or (path.aggroIndicatorMode or "BORDER") ~= "BORDER"
+                    end,
+                    args = {
+                        aggroBorderShape = {
+                            type = "select",
+                            name = L["Форма"],
+                            order = 1,
+                            values = aggroBorderShapes,
+                            get = function() return path.aggroBorderShape or "FRAME" end,
+                            set = function(_, v)
+                                path.aggroBorderShape = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroWidth = {
+                            type = "range",
+                            name = L["Ширина"],
+                            order = 2,
+                            min = -40,
+                            max = 120,
+                            step = 1,
+                            get = function() return path.aggroWidth or 0 end,
+                            set = function(_, v)
+                                path.aggroWidth = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroHeight = {
+                            type = "range",
+                            name = L["Высота"],
+                            order = 3,
+                            min = -40,
+                            max = 120,
+                            step = 1,
+                            get = function() return path.aggroHeight or 0 end,
+                            set = function(_, v)
+                                path.aggroHeight = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroBorderThickness = {
+                            type = "range",
+                            name = L["Толщина"],
+                            order = 4,
+                            min = 1,
+                            max = 8,
+                            step = 1,
+                            get = function() return path.aggroBorderThickness or 2 end,
+                            set = function(_, v)
+                                path.aggroBorderThickness = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroX = {
+                            type = "range",
+                            name = L["Смещение X"],
+                            order = 5,
+                            min = -100,
+                            max = 100,
+                            step = 1,
+                            get = function() return path.aggroX or 0 end,
+                            set = function(_, v)
+                                path.aggroX = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroY = {
+                            type = "range",
+                            name = L["Смещение Y"],
+                            order = 6,
+                            min = -100,
+                            max = 100,
+                            step = 1,
+                            get = function() return path.aggroY or 0 end,
+                            set = function(_, v)
+                                path.aggroY = v
+                                msh:Refresh()
+                            end,
+                        },
+                    },
+                },
+                aggroTextGroup = {
+                    type = "group",
+                    name = L["Текст"],
+                    order = 5,
+                    inline = true,
+                    hidden = function()
+                        return path.showAggroIndicator == false or (path.aggroIndicatorMode or "BORDER") ~= "TEXT"
+                    end,
+                    args = {
+                        aggroText = {
+                            type = "input",
+                            name = L["Текст аггро"],
+                            order = 1,
+                            width = "full",
+                            get = function() return path.aggroText or "" end,
+                            set = function(_, v)
+                                path.aggroText = v or ""
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroTextSize = {
+                            type = "range",
+                            name = L["Размер шрифта"],
+                            order = 2,
+                            min = 8,
+                            max = 48,
+                            step = 1,
+                            get = function() return path.aggroTextSize or 14 end,
+                            set = function(_, v)
+                                path.aggroTextSize = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroTextX = {
+                            type = "range",
+                            name = L["Смещение X"],
+                            order = 3,
+                            min = -100,
+                            max = 100,
+                            step = 1,
+                            get = function() return path.aggroTextX or 0 end,
+                            set = function(_, v)
+                                path.aggroTextX = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroTextY = {
+                            type = "range",
+                            name = L["Смещение Y"],
+                            order = 4,
+                            min = -100,
+                            max = 100,
+                            step = 1,
+                            get = function() return path.aggroTextY or 0 end,
+                            set = function(_, v)
+                                path.aggroTextY = v
+                                msh:Refresh()
+                            end,
+                        },
+                    },
+                },
+                aggroArrowGroup = {
+                    type = "group",
+                    name = L["Стрелка"],
+                    order = 6,
+                    inline = true,
+                    hidden = function()
+                        return path.showAggroIndicator == false or (path.aggroIndicatorMode or "BORDER") ~= "ARROW"
+                    end,
+                    args = {
+                        aggroArrowDirection = {
+                            type = "select",
+                            name = L["Направление"],
+                            order = 1,
+                            values = aggroArrowDirections,
+                            get = function() return path.aggroArrowDirection or "DOWN" end,
+                            set = function(_, v)
+                                path.aggroArrowDirection = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroArrowWidth = {
+                            type = "range",
+                            name = L["Ширина"],
+                            order = 2,
+                            min = 8,
+                            max = 120,
+                            step = 1,
+                            get = function() return path.aggroArrowWidth or 18 end,
+                            set = function(_, v)
+                                path.aggroArrowWidth = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroArrowHeight = {
+                            type = "range",
+                            name = L["Высота"],
+                            order = 3,
+                            min = 8,
+                            max = 120,
+                            step = 1,
+                            get = function() return path.aggroArrowHeight or 18 end,
+                            set = function(_, v)
+                                path.aggroArrowHeight = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroArrowX = {
+                            type = "range",
+                            name = L["Смещение X"],
+                            order = 4,
+                            min = -100,
+                            max = 100,
+                            step = 1,
+                            get = function() return path.aggroArrowX or 0 end,
+                            set = function(_, v)
+                                path.aggroArrowX = v
+                                msh:Refresh()
+                            end,
+                        },
+                        aggroArrowY = {
+                            type = "range",
+                            name = L["Смещение Y"],
+                            order = 5,
+                            min = -100,
+                            max = 100,
+                            step = 1,
+                            get = function() return path.aggroArrowY or 0 end,
+                            set = function(_, v)
+                                path.aggroArrowY = v
+                                msh:Refresh()
+                            end,
+                        },
+                    },
+                },
+                aggroPreview = {
+                    type = "execute",
+                    name = function()
+                        if msh.IsAggroIndicatorPreviewEnabled and msh.IsAggroIndicatorPreviewEnabled(path) then
+                            return L["Скрыть тест аггро"]
+                        end
+
+                        return L["Показать тест аггро"]
+                    end,
+                    desc = L["Показывает тестовый индикатор аггро без реальной угрозы."],
+                    order = 7,
+                    func = function()
+                        if msh.ToggleAggroIndicatorPreview then
+                            msh.ToggleAggroIndicatorPreview(path)
+                            msh:Refresh()
+                        end
+                    end,
+                },
+            },
+        },
         roles = {
             name = L["Иконки ролей"],
             type = "group",
-            order = 6,
+            order = 7,
             args = {
                 warning = reloadWarning,
                 useBlizzRole = {
@@ -1582,7 +1883,7 @@ local function GetUnitGroups(path)
         sorting = {
             name = L["Сортировка"],
             type = "group",
-            order = 7,
+            order = 8,
             args = {
                 roleSortMode = {
                     type = "select",
@@ -1698,6 +1999,25 @@ local defaultProfile = {
     raidMarkPoint = "RIGHT",
     raidMarkX = -5,
     raidMarkY = 15,
+
+    showAggroIndicator = true,
+    aggroIndicatorMode = "BORDER",
+    aggroBorderShape = "FRAME",
+    aggroColor = { r = 1.00, g = 0.15, b = 0.15, a = 0.95 },
+    aggroText = "",
+    aggroTextSize = 14,
+    aggroTextX = 0,
+    aggroTextY = 0,
+    aggroWidth = 0,
+    aggroHeight = 0,
+    aggroBorderThickness = 2,
+    aggroX = 0,
+    aggroY = 0,
+    aggroArrowDirection = "DOWN",
+    aggroArrowWidth = 18,
+    aggroArrowHeight = 18,
+    aggroArrowX = 0,
+    aggroArrowY = 0,
 
     useBlizzRole = false,
     showCustomRoleIcon = true,

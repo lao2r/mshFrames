@@ -353,6 +353,45 @@ hooksecurefunc("CompactUnitFrame_UpdateName", function(frame)
     end
 end)
 
+if CompactUnitFrame_UpdateAggroHighlight then
+    hooksecurefunc("CompactUnitFrame_UpdateAggroHighlight", function(frame)
+        local cfg = msh.GetConfigForFrame(frame)
+        if cfg and frame.mshLayersCreated and msh.UpdateUnitDisplay then
+            ns.cfg = cfg
+            msh.UpdateUnitDisplay(frame)
+        end
+    end)
+end
+
+function msh.UpdateVisibleUnitFrames(unit)
+    local function UpdateFrame(frame)
+        if not frame or not frame:IsShown() or not frame.mshLayersCreated then
+            return
+        end
+
+        local frameUnit = frame.displayedUnit or frame.unit
+        if unit and frameUnit ~= unit then
+            return
+        end
+
+        msh.UpdateUnitDisplay(frame)
+    end
+
+    for i = 1, 5 do
+        UpdateFrame(_G["CompactPartyFrameMember" .. i])
+    end
+
+    for i = 1, 40 do
+        UpdateFrame(_G["CompactRaidFrame" .. i])
+    end
+
+    for g = 1, 8 do
+        for m = 1, 5 do
+            UpdateFrame(_G["CompactRaidGroup" .. g .. "Member" .. m])
+        end
+    end
+end
+
 function msh:Refresh()
     for i = 1, 5 do
         local pf = _G["CompactPartyFrameMember" .. i]
@@ -416,27 +455,14 @@ function msh:OnEnable()
     end)
 
     self:RegisterEvent("RAID_TARGET_UPDATE", function()
-        for i = 1, 5 do
-            local pf = _G["CompactPartyFrameMember" .. i]
-            if pf and pf:IsShown() and pf.mshLayersCreated then
-                msh.UpdateUnitDisplay(pf)
-            end
-        end
+        msh.UpdateVisibleUnitFrames()
+    end)
 
-        for i = 1, 40 do
-            local rf = _G["CompactRaidFrame" .. i]
-            if rf and rf:IsShown() and rf.mshLayersCreated then
-                msh.UpdateUnitDisplay(rf)
-            end
-        end
+    self:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE", function(_, unit)
+        msh.UpdateVisibleUnitFrames(unit)
+    end)
 
-        for g = 1, 8 do
-            for m = 1, 5 do
-                local rfg = _G["CompactRaidGroup" .. g .. "Member" .. m]
-                if rfg and rfg:IsShown() and rfg.mshLayersCreated then
-                    msh.UpdateUnitDisplay(rfg)
-                end
-            end
-        end
+    self:RegisterEvent("UNIT_THREAT_LIST_UPDATE", function(_, unit)
+        msh.UpdateVisibleUnitFrames(unit)
     end)
 end

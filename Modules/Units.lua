@@ -2,6 +2,7 @@ local _, ns = ...
 local msh = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 local dispelOverlayPreviewState = setmetatable({}, { __mode = "k" })
+local aggroIndicatorPreviewState = setmetatable({}, { __mode = "k" })
 local knownDispelTypes = { "Magic", "Curse", "Disease", "Poison", "Bleed" }
 local dispelTypeAliases
 local DEBUG_DISPEL = false
@@ -34,6 +35,14 @@ local defaultDispelColors = {
     Disease = { r = 0.75, g = 0.55, b = 0.20, a = 0.95 },
     Poison = { r = 0.00, g = 0.85, b = 0.20, a = 0.95 },
     Bleed = { r = 0.80, g = 0.10, b = 0.10, a = 0.95 },
+}
+local defaultAggroColor = { r = 1.00, g = 0.15, b = 0.15, a = 0.95 }
+local aggroArrowAtlas = "minimal-scrollbar-arrow-bottom-down"
+local aggroArrowRotationByDirection = {
+    DOWN = 0,
+    LEFT = math.pi * 0.5,
+    UP = math.pi,
+    RIGHT = math.pi * -0.5,
 }
 local dispelOverlaySides = { "TOP", "BOTTOM", "LEFT", "RIGHT" }
 local dashedSegmentsPerSide = 16
@@ -124,6 +133,15 @@ local function NormalizeDispelType(value)
     end
 
     return nil
+end
+
+local function GetConfiguredColor(cfg, field, fallback)
+    local color = cfg and cfg[field]
+    if type(color) ~= "table" then
+        return fallback.r, fallback.g, fallback.b, fallback.a
+    end
+
+    return color.r or fallback.r, color.g or fallback.g, color.b or fallback.b, color.a or fallback.a
 end
 
 local function CreateOverlayTexture(parent, subLevel)
@@ -301,6 +319,230 @@ local function SetNativeDispelOverlayAlpha(frame, alpha)
 
         frame.DispelOverlay:SetAlpha(alpha)
     end
+end
+
+local function SetNativeAggroHighlightAlpha(frame, alpha)
+    if frame and frame.aggroHighlight and frame.aggroHighlight.SetAlpha then
+        if frame.aggroHighlight.mshOriginalAlpha == nil and frame.aggroHighlight.GetAlpha then
+            frame.aggroHighlight.mshOriginalAlpha = frame.aggroHighlight:GetAlpha()
+        end
+
+        frame.aggroHighlight:SetAlpha(alpha)
+    end
+end
+
+local function EnsureAggroIndicator(frame)
+    if not frame or not frame.healthBar or frame.mshAggroIndicator then
+        return
+    end
+
+    EnsureTextLayer(frame)
+
+    local holder = CreateFrame("Frame", nil, frame.mshTextLayer or frame)
+    holder:SetFrameStrata((frame.mshTextLayer and frame.mshTextLayer:GetFrameStrata()) or frame:GetFrameStrata())
+    holder:SetFrameLevel((frame.mshTextLayer and frame.mshTextLayer:GetFrameLevel()) or frame:GetFrameLevel() + 3)
+    holder:Hide()
+
+    holder.edges = {}
+    for index = 1, 8 do
+        holder.edges[index] = CreateOverlayTexture(holder, 3)
+    end
+
+    holder.label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    holder.label:SetDrawLayer("OVERLAY", 7)
+    holder.label:Hide()
+
+    holder.arrow = holder:CreateTexture(nil, "OVERLAY", nil, 7)
+    if holder.arrow.SetAtlas then
+        holder.arrow:SetAtlas(aggroArrowAtlas, false)
+    else
+        holder.arrow:SetTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+    end
+    holder.arrow:SetTexCoord(0, 1, 0, 1)
+    holder.arrow:Hide()
+
+    frame.mshAggroIndicator = holder
+end
+
+local function HideAggroIndicator(frame)
+    local holder = frame and frame.mshAggroIndicator
+    if not holder then
+        return
+    end
+
+    for _, texture in ipairs(holder.edges or {}) do
+        texture:Hide()
+    end
+
+    if holder.label then
+        holder.label:Hide()
+    end
+
+    if holder.arrow then
+        holder.arrow:Hide()
+    end
+
+    holder:Hide()
+end
+
+local function SetAggroEdge(texture, point, relativeTo, relativePoint, x, y, width, height, r, g, b, a)
+    if not texture then
+        return
+    end
+
+    texture:ClearAllPoints()
+    texture:SetPoint(point, relativeTo, relativePoint, x or 0, y or 0)
+    texture:SetSize(width, height)
+    texture:SetVertexColor(r, g, b, a)
+    texture:Show()
+end
+
+local function UpdateAggroBorder(holder, shape, width, height, thickness, r, g, b, a)
+    local edges = holder and holder.edges
+    if not edges then
+        return
+    end
+
+    for _, texture in ipairs(edges) do
+        texture:Hide()
+    end
+
+    local segment = math.max(thickness * 2, math.floor(math.min(width, height) * 0.3))
+
+    if shape == "CORNERS" then
+        SetAggroEdge(edges[1], "TOPLEFT", holder, "TOPLEFT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[2], "TOPLEFT", holder, "TOPLEFT", 0, 0, thickness, segment, r, g, b, a)
+        SetAggroEdge(edges[3], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[4], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, thickness, segment, r, g, b, a)
+        SetAggroEdge(edges[5], "BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[6], "BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0, thickness, segment, r, g, b, a)
+        SetAggroEdge(edges[7], "BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[8], "BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0, thickness, segment, r, g, b, a)
+    elseif shape == "BRACKETS" then
+        SetAggroEdge(edges[1], "TOPLEFT", holder, "TOPLEFT", 0, 0, thickness, height, r, g, b, a)
+        SetAggroEdge(edges[2], "TOPLEFT", holder, "TOPLEFT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[3], "BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[4], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, thickness, height, r, g, b, a)
+        SetAggroEdge(edges[5], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, segment, thickness, r, g, b, a)
+        SetAggroEdge(edges[6], "BOTTOMRIGHT", holder, "BOTTOMRIGHT", 0, 0, segment, thickness, r, g, b, a)
+    else
+        SetAggroEdge(edges[1], "TOPLEFT", holder, "TOPLEFT", 0, 0, width, thickness, r, g, b, a)
+        SetAggroEdge(edges[2], "BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0, width, thickness, r, g, b, a)
+        SetAggroEdge(edges[3], "TOPLEFT", holder, "TOPLEFT", 0, 0, thickness, height, r, g, b, a)
+        SetAggroEdge(edges[4], "TOPRIGHT", holder, "TOPRIGHT", 0, 0, thickness, height, r, g, b, a)
+    end
+end
+
+local function UpdateAggroIndicator(frame, cfg)
+    if not frame or not cfg or not frame.healthBar then
+        return
+    end
+
+    EnsureAggroIndicator(frame)
+
+    local previewEnabled = cfg and aggroIndicatorPreviewState[cfg] == true
+
+    if cfg.showAggroIndicator == false then
+        HideAggroIndicator(frame)
+        SetNativeAggroHighlightAlpha(frame, frame.aggroHighlight and (frame.aggroHighlight.mshOriginalAlpha or 1) or 1)
+        return
+    end
+
+    local unit = frame.displayedUnit or frame.unit
+    local threatStatus = unit and UnitExists(unit) and UnitThreatSituation(unit) or nil
+    local hasAggro = previewEnabled or (frame.aggroHighlight and frame.aggroHighlight:IsShown()) or (threatStatus and threatStatus > 1) or false
+
+    if not hasAggro then
+        HideAggroIndicator(frame)
+        SetNativeAggroHighlightAlpha(frame, 0)
+        return
+    end
+
+    local holder = frame.mshAggroIndicator
+    local mode = cfg.aggroIndicatorMode or "BORDER"
+    local shape = cfg.aggroBorderShape or "FRAME"
+    local r, g, b, a = GetConfiguredColor(cfg, "aggroColor", defaultAggroColor)
+    local baseWidth = (frame.healthBar.GetWidth and frame.healthBar:GetWidth()) or 0
+    local baseHeight = (frame.healthBar.GetHeight and frame.healthBar:GetHeight()) or 0
+    local offsetX = 0
+    local offsetY = 0
+    local width
+    local height
+
+    if mode == "BORDER" then
+        width = math.max(4, baseWidth + (cfg.aggroWidth or 0))
+        height = math.max(4, baseHeight + (cfg.aggroHeight or 0))
+        offsetX = cfg.aggroX or 0
+        offsetY = cfg.aggroY or 0
+    elseif mode == "TEXT" then
+        local fontSize = math.max(8, math.floor(cfg.aggroTextSize or 14))
+        width = math.max(12, baseWidth)
+        height = math.max(12, fontSize + 6)
+        offsetX = cfg.aggroTextX or 0
+        offsetY = cfg.aggroTextY or 0
+    else
+        width = math.max(8, math.floor(cfg.aggroArrowWidth or 18))
+        height = math.max(8, math.floor(cfg.aggroArrowHeight or 18))
+        offsetX = cfg.aggroArrowX or 0
+        offsetY = cfg.aggroArrowY or 0
+    end
+
+    holder:ClearAllPoints()
+    holder:SetSize(width, height)
+    holder:SetPoint("CENTER", frame.healthBar, "CENTER", offsetX, offsetY)
+    holder:Show()
+
+    for _, texture in ipairs(holder.edges or {}) do
+        texture:Hide()
+    end
+    holder.label:Hide()
+    holder.arrow:Hide()
+
+    if mode == "TEXT" then
+        local aggroText = cfg.aggroText
+        if type(aggroText) ~= "string" or aggroText == "" then
+            aggroText = L["АГРО"]
+        end
+
+        local fontPath = LSM:Fetch("font", cfg.fontName or "Friz Quadrata TT")
+        holder.label:SetFont(fontPath, math.max(8, math.floor(cfg.aggroTextSize or 14)), cfg.nameOutline or "OUTLINE")
+        holder.label:SetText(aggroText)
+        holder.label:SetTextColor(r, g, b, a)
+        holder.label:ClearAllPoints()
+        holder.label:SetPoint("CENTER", holder, "CENTER")
+        holder.label:Show()
+    elseif mode == "ARROW" then
+        local direction = cfg.aggroArrowDirection or "DOWN"
+        local rotation = aggroArrowRotationByDirection[direction] or 0
+        holder.arrow:ClearAllPoints()
+        holder.arrow:SetPoint("CENTER", holder, "CENTER")
+        holder.arrow:SetSize(width, height)
+        holder.arrow:SetVertexColor(r, g, b, a)
+        if holder.arrow.SetAtlas then
+            holder.arrow:SetAtlas(aggroArrowAtlas, false)
+        end
+        if holder.arrow.SetRotation then
+            holder.arrow:SetRotation(rotation)
+        end
+        holder.arrow:Show()
+    else
+        local thickness = math.max(1, math.floor(cfg.aggroBorderThickness or 2))
+        UpdateAggroBorder(holder, shape, width, height, thickness, r, g, b, a)
+    end
+
+    SetNativeAggroHighlightAlpha(frame, 0)
+end
+
+function msh.IsAggroIndicatorPreviewEnabled(cfg)
+    return cfg and aggroIndicatorPreviewState[cfg] == true or false
+end
+
+function msh.ToggleAggroIndicatorPreview(cfg)
+    if not cfg then
+        return
+    end
+
+    aggroIndicatorPreviewState[cfg] = not aggroIndicatorPreviewState[cfg]
 end
 
 local function LayoutOverlayEdge(texture, overlay, side, offset, thickness)
@@ -958,6 +1200,7 @@ function msh.CreateUnitLayers(frame)
     if frame.leaderIcon then frame.leaderIcon:SetAlpha(0) end
 
     EnsureDispelOverlay(frame)
+    EnsureAggroIndicator(frame)
 
     frame.mshLayersCreated = true
 end
@@ -1034,6 +1277,8 @@ function msh.UpdateUnitDisplay(frame)
             frame.mshLeader:Hide()
         end
     end
+
+    UpdateAggroIndicator(frame, cfg)
 
     if frame.mshDispelIndicator then
         local globalMode = "0"
